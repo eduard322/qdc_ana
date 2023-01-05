@@ -442,7 +442,7 @@ def pid_ana_mc(Nev = options.nEvents, fit = "langau", title = "US_QDC_distributi
  #                         vertical(4) planes, 60 bar, readout on top, single channel
 
  bin_min = 0.
- bin_max = 30.
+ bin_max = 100.
  hist_list = {}
  hist_list_mc = {}
  hist_list_mc_full = {}
@@ -450,11 +450,11 @@ def pid_ana_mc(Nev = options.nEvents, fit = "langau", title = "US_QDC_distributi
  for l in range(20, 25):
     #ut.bookHist(h,'sig_'+str(l),'signal / plane '+str(l),200,0.0,50.)
     h =  ROOT.TH1I("plane" + f"_{l}", "plane" + f"_{l}", 200, bin_min, bin_max)
-    h_mc_full =  ROOT.TH1I("plane" + f"_{l}_mc_full", "plane_mc_full" + f"_{l}", 200, bin_min, bin_max)
+    h_mc_full =  ROOT.TH1I("plane" + f"_{l}_mc_full", "plane_mc_full" + f"_{l}", 200, 0, 1e-2)
     hist_list_mc_full[l] = h_mc_full
     hist_list[l] = h
     for pid in list_of_selected_pid:
-      h_mc =  ROOT.TH1I("plane" + f"_{l}_mc_{pid}", "plane_mc" + f"_{l}_{pid}", 200, bin_min, bin_max)
+      h_mc =  ROOT.TH1I("plane" + f"_{l}_mc_{pid}", "plane_mc" + f"_{l}_{pid}", 200, 0, 1e-2)
       hist_list_mc[f"_{l}_mc_{pid}"] = h_mc
 
  N=-1
@@ -467,7 +467,7 @@ def pid_ana_mc(Nev = options.nEvents, fit = "langau", title = "US_QDC_distributi
     w = event.MCTrack[0].GetWeight() # assume these are muon background events.
     list_of_detectors = []
     N+=1
-    if N%options.heartBeat == 0: print('event ',N,' ',time.ctime())
+    if N%2000 == 0: print('event ',N,' ',time.ctime())
     if N>Nev: break
     for i, aHit in enumerate(event.Digi_MuFilterHits):
         if not aHit.isValid(): continue
@@ -483,12 +483,13 @@ def pid_ana_mc(Nev = options.nEvents, fit = "langau", title = "US_QDC_distributi
         points = L.wList(detID)
         for p in points:
           pid = event.MuFilterPoint[p[0]].PdgCode()
-          hist_list_mc_full[s*10 + l].Fill(event.MuFilterPoint[p[0]].GetEnergyLoss(), w)
+          hist_list_mc_full[s*10 + l].Fill(event.MuFilterPoint[p[0]].GetEnergyLoss())
           if np.abs(pid) in list_of_selected_pid:
-            hist_list_mc[f"_{s*10 + l}_mc_{np.abs(pid)}"].Fill(event.MuFilterPoint[p[0]].GetEnergyLoss(), w)
+            hist_list_mc[f"_{s*10 + l}_mc_{np.abs(pid)}"].Fill(event.MuFilterPoint[p[0]].GetEnergyLoss())
           if pid in list_of_pid:
             list_of_pid[pid] += 1 
             continue
+          list_of_pid[pid] = 0 
 
         qdc_value = ana.av_qdc(aHit)
         if qdc_value == -1:
@@ -496,47 +497,60 @@ def pid_ana_mc(Nev = options.nEvents, fit = "langau", title = "US_QDC_distributi
         
         hist_list[s*10 + l].Fill(qdc_value)
 
-          list_of_pid[pid] = 0 
+        
  print(list_of_pid)
  # langau fit
- c  = ROOT.TCanvas("US QDC distribution","US QDC distribution",0,0,1000,800)
- c.Divide(2,3)
- for i, plane in enumerate(hist_list.keys()):
-    #print(i)
-    c.cd(i+1)
-    if fit == "langau":
-      ana.fit_langau(hist_list[plane], str(plane), bin_min, bin_max)
-    else:
-      hist_list[plane].Fit("pol5")
-    hist_list[plane].Draw()
- c.SaveAs(title + "_" + fit + ".root")
+#  c  = ROOT.TCanvas("US QDC distribution","US QDC distribution",0,0,1000,800)
+#  c.Divide(2,3)
+#  for i, plane in enumerate(hist_list.keys()):
+#     #print(i)
+#     c.cd(i+1)
+#     if fit == "langau":
+#       ana.fit_langau(hist_list[plane], str(plane), bin_min, bin_max)
+#     else:
+#       hist_list[plane].Fit("pol5")
+#     hist_list[plane].Draw()
+#  c.SaveAs(title + "_" + fit + ".root")
 
- c1  = ROOT.TCanvas("US QDC distribution MC","US QDC distribution MC",0,0,1000,800)
- c1.Divide(2,3)
- for i, plane in enumerate(hist_list_mc.keys()):
-    #print(i)
-    c1.cd(i+1)
-    if fit == "langau":
-      ana.fit_langau(hist_list_mc[plane], str(plane), bin_min, bin_max)
-    else:
-      hist_list_mc[plane].Fit("pol5")
-    hist_list_mc[plane].Draw()
- c1.SaveAs(title + "_" + fit + "_mc_enloss.root")
-
-
- c2  = ROOT.TCanvas("US QDC distribution MC","US QDC distribution MC",0,0,1000,800)
- c2.Divide(2,3)
- for i, plane in enumerate(hist_list_mc_full.keys()):
-    #print(i)
-    c2.cd(i+1)
-    if fit == "langau":
-      ana.fit_langau(hist_list_mc_full[plane], str(plane), bin_min, bin_max)
-    else:
-      hist_list_mc_full[plane].Fit("pol5")
-    hist_list_mc_full[plane].Draw()
- c2.SaveAs(title + "_" + fit + "_mc_enloss_full.root")
+#  c1  = ROOT.TCanvas("US QDC distribution MC","US QDC distribution MC",0,0,1000,800)
+#  c1.Divide(2,3)
+#  for i, plane in enumerate(hist_list_mc.keys()):
+#     #print(i)
+#     c1.cd(i+1)
+#     if fit == "langau":
+#       ana.fit_langau(hist_list_mc[plane], str(plane), bin_min, bin_max)
+#     else:
+#       hist_list_mc[plane].Fit("pol5")
+#     hist_list_mc[plane].Draw()
+#  c1.SaveAs(title + "_" + fit + "_mc_enloss.root")
 
 
+#  c2  = ROOT.TCanvas("US QDC distribution MC","US QDC distribution MC",0,0,1000,800)
+#  c2.Divide(2,3)
+#  for i, plane in enumerate(hist_list_mc_full.keys()):
+#     #print(i)
+#     c2.cd(i+1)
+#     if fit == "langau":
+#       ana.fit_langau(hist_list_mc_full[plane], str(plane), bin_min, bin_max)
+#     else:
+#       hist_list_mc_full[plane].Fit("pol5")
+#     hist_list_mc_full[plane].Draw()
+#  c2.SaveAs(title + "_" + fit + "_mc_enloss_full.root")
 
-#pid_ana_mc(10000, "langau", "US_QDC_distributions_MC")
+
+ File = ROOT.TFile.Open(f"{options.runNumber}_run.root", "RECREATE")
+
+ def write_dict_to_file(dict_obj, File):
+    for key in dict_obj.keys():
+      File.WriteObject(dict_obj[key], dict_obj[key].GetTitle())
+ 
+ hists_all = [hist_list, hist_list_mc, hist_list_mc_full]
+ for H in hists_all:
+   write_dict_to_file(H, File)
+ File.Close()
+
+
+
+
+pid_ana_mc(5000, "langau", "US_QDC_distributions_MC")
 #qdc_dist(1000000, "langau", "US_QDC_distributions_run_90")
