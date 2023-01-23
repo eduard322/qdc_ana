@@ -5,6 +5,7 @@ import numpy as np
 Tkey  = ROOT.std.vector('TString')()
 Ikey   = ROOT.std.vector('int')()
 Value = ROOT.std.vector('float')()
+verticalBarDict={0:1, 1:3, 2:5, 3:6}
 
 
 def map2Dict(aHit,T='GetAllSignals',mask=True):
@@ -25,9 +26,91 @@ def map2Dict(aHit,T='GetAllSignals',mask=True):
          else: theDict[key[k]] = Value[k]
      return theDict
 
+def parseDetID(detID):
+   subsystem=detID//10000
+   if subsystem ==1 or subsystem==2:
+      plane=detID%10000//1000
+      bar=detID%1000
+      return subsystem, plane, bar
+   if subsystem == 3:
+      bar=detID%1000
+      if bar>59:
+         plane=verticalBarDict[detID%10000//1000]
+      elif bar<60:
+         plane=2*detID%10000//1000
+      return subsystem, plane, bar
 
 
-def av_qdc(aHit):
+def OneHitPerUS(DigiHits):
+   #US_planes_all = {i for i in range(5)}
+   USPlanes={}
+	# for i, aHit in enumerate(eventTree.Digi_MuFilterHit):
+   for i, aHit in enumerate(DigiHits):
+      if not aHit.isValid(): continue
+      detID=aHit.GetDetectorID()
+      subsystem, plane, bar = parseDetID(detID)
+      if subsystem != 2: continue
+      if plane in USPlanes: 
+        continue
+      else:
+        USPlanes[plane] = 1
+      # !!!!!!!!!!!!
+      USPlanes[plane] += 1
+      # !!!!!!!!!!!1 :)
+   #print(len(USPlanes.keys()))
+   if len(USPlanes.keys()) != 5: return False
+   for plane in USPlanes:
+      if USPlanes[plane] != 1:
+         return False
+   print("!!!!!")
+   return True
+
+def OneHitUS1(DigiHits):
+   #US_planes_all = {i for i in range(5)}
+   USPlanes={}
+	# for i, aHit in enumerate(eventTree.Digi_MuFilterHit):
+   for i, aHit in enumerate(DigiHits):
+      if not aHit.isValid(): continue
+      detID=aHit.GetDetectorID()
+      subsystem, plane, bar = parseDetID(detID)
+      if subsystem != 2: continue
+      if plane in USPlanes: 
+        continue
+      else:
+        USPlanes[plane] = 1
+      # !!!!!!!!!!!!
+      USPlanes[plane] += 1
+      # !!!!!!!!!!!1 :)
+   #print(len(USPlanes.keys()))
+   if 0 in USPlanes.keys():
+      return True
+   else:
+      return False
+
+
+def av_qdc(aHit, cut = 11):
+    nSiPMs = aHit.GetnSiPMs()
+    nSides  = aHit.GetnSides()
+    allChannels = map2Dict(aHit,'GetAllSignals')
+    channels = [allChannels[c] for c in allChannels]
+    ch = 0 
+    for c in allChannels:
+        if allChannels[c] != 0:
+            ch += 1
+    if ch < cut: return -1
+    if nSides==2:
+        Sleft    = []
+        Sright = []
+    for c in allChannels:
+        if allChannels[c] == 0: continue
+        if  nSiPMs > c:  # left side
+                Sleft.append(allChannels[c])
+        else:
+                Sright.append(allChannels[c])
+    return np.sqrt(np.array(Sleft).mean()*np.array(Sright).mean())
+
+
+def qdc_left_right(aHit):
     nSiPMs = aHit.GetnSiPMs()
     nSides  = aHit.GetnSides()
     allChannels = map2Dict(aHit,'GetAllSignals')
@@ -45,8 +128,7 @@ def av_qdc(aHit):
                 Sleft.append(allChannels[c])
         else:
                 Sright.append(allChannels[c])
-    return np.sqrt(np.array(Sleft).mean()*np.array(Sright).mean())
-
+    return (np.array(Sleft).mean(), np.array(Sright).mean())
 
 def fit_langau(hist,o,bmin,bmax):
     params = {0:'Width(scale)',1:'mostProbable',2:'norm',3:'sigma'}

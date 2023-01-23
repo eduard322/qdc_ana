@@ -2408,7 +2408,7 @@ def MIP_study_1(Nev = options.nEvents, key_filter = 0):
       myPrint(h[TYPE + 'signal'    +str(s)],TYPE + 'mip_signal_mean_key_' + str(key_filter) + "_" + sdict[s])
 
 
-def DS_track():
+def DS_track(HITS):
 	# check for low occupancy and enough hits in DS stations
    stations = {}
    # for s in systemAndPlanes:
@@ -2417,7 +2417,7 @@ def DS_track():
       stations[30+plane] = {}
     # k=-1
    # for i, aHit in enumerate(eventTree.Digi_MuFilterHit):
-   for i, aHit in enumerate(eventTree.Digi_MuFilterHits):
+   for i, aHit in enumerate(HITS):
       # k+=1
       if not aHit.isValid(): continue
       detID=aHit.GetDetectorID()
@@ -2426,16 +2426,15 @@ def DS_track():
       key=subsystem*10+plane
       #print(aHit)
       stations[key][i]=aHit
-   if not len(stations[30])*len(stations[31])*len(stations[32])*len(stations[32]) == 1: return (-1,-1) # If not 1 hit in each DS plane
+   if not len(stations[30])*len(stations[31])*len(stations[32])*len(stations[33]) == 1: return (-1,-1) # If not 1 hit in each DS plane
 	#	build trackCandidate
    hitlist = {}
    for p in range(30,34):
       k = list(stations[p].keys())[0]
       hitlist[k] = stations[p][k]
-   #print("!!!!!!!!!!!!!!!!!!")
    theTrack = trackTask.fitTrack(hitlist)
-   #print(theTrack)
-   #print("!!!!!!!!!!!!!!!!!!")
+   if theTrack.getFitStatus().isFitConverged():
+      print("FIT IS CONVERGED")
    return theTrack	
 
 def MIP_study_2(Nev = options.nEvents, file_name = "", oneUShitperPlane = True, key_filter = 0):
@@ -2464,23 +2463,23 @@ def MIP_study_2(Nev = options.nEvents, file_name = "", oneUShitperPlane = True, 
     if oneUShitperPlane: 
       if not muAna.OneHitPerUS(eventTree.Digi_MuFilterHits): 
          continue
-    #print("!!!!!!!!!!!!!!!!!!")
-    theTrack = DS_track()
-    #print(theTrack, stations)
-    if theTrack == (-1,-1):
-      continue
-    #print("STRANGE TRACK")
-    if not hasattr(theTrack, "getFittedState"):
-      continue
-    print("ALMOST GOOD TRACK")
-    if not theTrack.getFitStatus().isFitConverged():
-      theTrack.Delete()
-      continue			
-		# if not hasattr(theTrack, "getFittedState"): continue
-    state=theTrack.getFittedState()
-    pos=state.getPos()
-    mom=state.getMom()
-    print("GOOD TRACK")
+   #  #print("!!!!!!!!!!!!!!!!!!")
+   #  theTrack = DS_track(eventTree.Digi_MuFilterHits)
+   #  #print(theTrack, stations)
+   #  if theTrack == (-1,-1):
+   #    continue
+   #  #print("STRANGE TRACK")
+   #  if not hasattr(theTrack, "getFittedState"):
+   #    continue
+   #  #print("ALMOST GOOD TRACK")
+   #  if not theTrack.getFitStatus().isFitConverged():
+   #    theTrack.Delete()
+   #    continue			
+	# 	# if not hasattr(theTrack, "getFittedState"): continue
+   #  state=theTrack.getFittedState()
+   #  pos=state.getPos()
+   #  mom=state.getMom()
+   #  print("GOOD TRACK")
 
 
    
@@ -2559,7 +2558,7 @@ def MIP_study_2(Nev = options.nEvents, file_name = "", oneUShitperPlane = True, 
 #Mufi_hitMaps_qdc_sipm_filter(1000000) # qdc distribution sipm filter
 #Mufi_hitMaps_qdc_5planes_hits(1000000)
 #Mufi_hitMaps_mean_qdc(1000000, 1)
-MIP_study_2(1000000)
+MIP_study_2(-1, oneUShitperPlane = False)
 #execute_mufi_hit_maps_filtered(1000000) # qdc distribution filtered
    
    

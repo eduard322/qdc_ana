@@ -211,12 +211,40 @@ def OneHitPerUS(DigiHits):
          return False
    return True
 
+# def DS_track(DigiHits):
+#    systemAndPlanes = {1:2,2:5,3:6}
+# 	# check for low occupancy and enough hits in DS stations
+#    stations = {}
+#    # for s in systemAndPlanes:
+#    for plane in range(systemAndPlanes[3]+1): 
+
+#       stations[30+plane] = {}
+#     # k=-1
+#    # for i, aHit in enumerate(eventTree.Digi_MuFilterHit):
+#    for i, aHit in enumerate(DigiHits):
+#       # k+=1
+#       if not aHit.isValid(): continue
+#       detID=aHit.GetDetectorID()
+#       subsystem, plane, bar = parseDetID(detID)
+#       if subsystem != 3: continue
+#       key=subsystem*10+plane
+#       #print(key)
+#       stations[key][i]=aHit
+#    if not len(stations[30])*len(stations[31])*len(stations[32])*len(stations[33]) == 1: return -1 # If not 1 hit in each DS plane
+# 	#	build trackCandidate
+#    hitlist = {}
+#    for p in range(30,34):
+#       k = list(stations[p].keys())[0]
+#       hitlist[k] = stations[p][k]
+#    theTrack = trackTask.fitTrack(hitlist)
+#    print(theTrack)
+#    return theTrack
+
 def DS_track(DigiHits):
-   systemAndPlanes = {1:2,2:5,3:6}
 	# check for low occupancy and enough hits in DS stations
    stations = {}
    # for s in systemAndPlanes:
-   for plane in range(systemAndPlanes[3]+1): 
+   for plane in range(systemAndPlanes[3]): 
 
       stations[30+plane] = {}
     # k=-1
@@ -228,17 +256,16 @@ def DS_track(DigiHits):
       subsystem, plane, bar = parseDetID(detID)
       if subsystem != 3: continue
       key=subsystem*10+plane
-      #print(key)
       stations[key][i]=aHit
    if not len(stations[30])*len(stations[31])*len(stations[32])*len(stations[33]) == 1: return -1 # If not 1 hit in each DS plane
 	#	build trackCandidate
    hitlist = {}
-   for p in range(30,34):
+   print(stations[30].keys(), len(stations[30].keys()))
+   for p in range(30,34): 
       k = list(stations[p].keys())[0]
       hitlist[k] = stations[p][k]
    theTrack = trackTask.fitTrack(hitlist)
-   print(theTrack)
-   return theTrack	
+   return theTrack		
 
 def delta_min_t(aHit):
    times = aHit.GetAllTimes()
