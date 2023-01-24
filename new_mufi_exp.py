@@ -605,28 +605,35 @@ def beamSpot():
 #    return True
 
 
-def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, DSTrack = True, optionTrack = "DS", title = "US_QDC_distributions"):
+def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, DSTrack = True, optionTrack = "DS", title = "US_QDC_distributions", label = "QDC"):
 
  # veto system 2 layers with 7 bars and 8 sipm channels on both ends
  # US system 5 layers with 10 bars and 8 sipm channels on both ends
  # DS system horizontal(3) planes, 60 bars, readout on both sides, single channel
  #                         vertical(4) planes, 60 bar, readout on top, single channel
  
+ MPVs = [8.43, 8.14, 8.97, 7.32, 9.01]
  bin_min = 0.
  bin_max = 50.
  hist_list = {}
+ hist_list_l = {}
+ hist_list_r = {}
  hist_list_lr = {}
  QDC_list = []
  h_slope =  ROOT.TH2I("slope","slope", 100,-0.5,1.,100,-0.5,1.)
  for l in range(20, 25):
     #ut.bookHist(h,'sig_'+str(l),'signal / plane '+str(l),200,0.0,50.)
-    h =  ROOT.TH1I("plane" + f"_{l}", "plane" + f"_{l}; E_dep [MIP];", 200, bin_min, bin_max)
+    h =  ROOT.TH1I("plane" + f"_{l}", "plane" + f"_{l}; {label};", 200, bin_min, bin_max)
+    h_l =  ROOT.TH1I("plane" + f"_{l}", "plane" + f"_{l}; {label};", 200, bin_min, bin_max)
+    h_r =  ROOT.TH1I("plane" + f"_{l}", "plane" + f"_{l}; {label};", 200, bin_min, bin_max)
     hist_list_lr[l] = {}
     for bar in range(10):
       h_lr =  ROOT.TH2I("plane" + f"_{l}_{bar}_lr", "plane" + f"_{l}_{bar}_lr", 100,-0.5,200.,100,-0.5,200.)
       hist_list_lr[l][bar] = h_lr
     #h_lr =  ROOT.TH2I("plane" + f"_{l}_lr", "plane" + f"_{l}_lr", 100,-0.5,200.,100,-0.5,200.)
     hist_list[l] = h
+    hist_list_l[l] = h_l
+    hist_list_r[l] = h_r
     #hist_list_lr[l] = h_lr
 
 #  for l in range(30, 37):
@@ -686,30 +693,57 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
         qdc_value = ana.av_qdc(aHit)
         if qdc_value == -1:
             continue
-        QDC_list.append(qdc_value)
+        #QDC_list.append(qdc_value)
         #print(s*10 + l)
         hist_list[s*10 + l].Fill(qdc_value)
         q_l, q_r = ana.qdc_left_right(aHit)
+        hist_list_l[s*10 + l].Fill(q_l)
+        hist_list_r[s*10 + l].Fill(q_r)
         hist_list_lr[s*10 + l][bar].Fill(q_l, q_r)
 
 
- median = np.median(np.array(QDC_list))
+ #median = np.median(np.array(QDC_list))
  #langau fit
  c  = ROOT.TCanvas("US QDC distribution","US QDC distribution",0,0,1000,1000)
  c.Divide(2,3)
  for i, plane in enumerate(hist_list.keys()):
-    for j in range(200):
-      bin_old = hist_list[plane].GetBinContent(j)
-      hist_list[plane].SetBinContent(j, bin_old/median)
+   #  for j in range(200):
+   #    bin_old = hist_list[plane].GetBinContent(j)
+   #    hist_list[plane].SetBinContent(j, bin_old/median)
     #print(i)
     c.cd(i+1)
-   #  if fit == "langau":
-   #    ana.fit_langau(hist_list[plane], str(plane), bin_min, bin_max)
-   #  else:
-       #hist_list[plane].Fit("pol5")
+    ana.fit_langau(hist_list[plane], str(plane), bin_min, bin_max)
     hist_list[plane].Draw()
  c.SaveAs(title + "_qdc" + ".root")
- c.SaveAs(title + "_qdc" + ".png")
+ c.SaveAs(title + "_qdc" + ".pdf")
+
+ c  = ROOT.TCanvas("US QDC_l distribution","US QDC_l distribution",0,0,1000,1000)
+ c.Divide(2,3)
+ for i, plane in enumerate(hist_list_l.keys()):
+   #  for j in range(200):
+   #    bin_old = hist_list[plane].GetBinContent(j)
+   #    hist_list[plane].SetBinContent(j, bin_old/median)
+    #print(i)
+    c.cd(i+1)
+    ana.fit_langau(hist_list_l[plane], str(plane), bin_min, bin_max)
+    hist_list_l[plane].Draw()
+ c.SaveAs(title + "_qdc_l" + ".root")
+ c.SaveAs(title + "_qdc_l" + ".pdf")
+
+
+ c  = ROOT.TCanvas("US QDC_r distribution","US QDC_r distribution",0,0,1000,1000)
+ c.Divide(2,3)
+ for i, plane in enumerate(hist_list_r.keys()):
+   #  for j in range(200):
+   #    bin_old = hist_list[plane].GetBinContent(j)
+   #    hist_list[plane].SetBinContent(j, bin_old/median)
+    #print(i)
+    c.cd(i+1)
+    ana.fit_langau(hist_list_r[plane], str(plane), bin_min, bin_max)
+    hist_list_r[plane].Draw()
+ c.SaveAs(title + "_qdc_r" + ".root")
+ c.SaveAs(title + "_qdc_r" + ".pdf")
+
 
  c  = ROOT.TCanvas("Q_L vs. Q_R distribution","Q_L vs. Q_R distribution",0,0,1200,1200)
  c.Divide(3,4)
@@ -756,5 +790,5 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
 #Mufi_hitMaps(1000)
 #qdc_dist_per_bar(1000000, "langau", "US_QDC_distributions_run_54")
 
-#MIP_study(Nev = 10000, oneUShitperPlane = True, withReco = True, DSTrack = True, optionTrack = "DS", title = "100_gev_muon_ds_on_us_on_sipm_on_reco_on")
+MIP_study(Nev = 1000000, oneUShitperPlane = True, withReco = True, DSTrack = True, optionTrack = "DS", title = "100_gev_muon_ds_on_us_on_sipm_on_reco_on")
 
