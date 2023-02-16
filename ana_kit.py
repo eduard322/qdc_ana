@@ -5,6 +5,7 @@ import numpy as np
 Tkey  = ROOT.std.vector('TString')()
 Ikey   = ROOT.std.vector('int')()
 Value = ROOT.std.vector('float')()
+A,B,locA,locB,globA,globB    = ROOT.TVector3(),ROOT.TVector3(),ROOT.TVector3(),ROOT.TVector3(),ROOT.TVector3(),ROOT.TVector3()
 verticalBarDict={0:1, 1:3, 2:5, 3:6}
 
 
@@ -132,13 +133,13 @@ def extrapolate(theTrack,z_mid):
     y=pos.y()+slope_y*(z_mid-pos.z())
     return x,y
 
-def residual(theTrack, detID):
+def residual(theTrack, detID, MuFilter):
     MuFilter.GetPosition(detID,A,B)
     Z = 0.5*(A[2]+B[2])
     Y = 0.5*(A[1]+B[1])
     xEx, yEx = extrapolate(theTrack,Z)
     resY = yEx-Y
-    return res
+    return resY
 
 
 

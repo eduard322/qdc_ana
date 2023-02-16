@@ -655,12 +655,12 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
  # DS system horizontal(3) planes, 60 bars, readout on both sides, single channel
  #                         vertical(4) planes, 60 bar, readout on top, single channel
  
- ut.bookHist(h,'bs','beam spot',100,-100.,10.,100,0.,80.)
- ut.bookHist(h,'bsDS','beam spot',60,-0.5,59.5,60,-0.5,59.5)
- for s in systemAndPlanes:
-    for l in range(systemAndPlanes[s]):
-      ut.bookHist(h,'Tsig_'+str(s*10+l),'signal / plane '+str(s*10+l),200,0.0,200.)
- ut.bookHist(h,'slopes','track slopes',100,-0.1,0.1,100,-0.1,0.1)
+#  ut.bookHist(h,'bs','beam spot',100,-100.,10.,100,0.,80.)
+#  ut.bookHist(h,'bsDS','beam spot',60,-0.5,59.5,60,-0.5,59.5)
+#  for s in systemAndPlanes:
+#     for l in range(systemAndPlanes[s]):
+#       ut.bookHist(h,'Tsig_'+str(s*10+l),'signal / plane '+str(s*10+l),200,0.0,200.)
+#  ut.bookHist(h,'slopes','track slopes',100,-0.1,0.1,100,-0.1,0.1)
 
 
  
@@ -752,7 +752,7 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
         bar = (detID%1000)
 
         # residual cut
-        if ana.residual(theTrack, detID) >= 6.:
+        if ana.residual(theTrack, detID, MuFilter) >= 6.:
          continue
 
         if s != 2 : continue
@@ -917,12 +917,12 @@ def convert_data(Nev = options.nEvents):
 #Mufi_hitMaps(1000)
 #qdc_dist_per_bar(1000000, "langau", "US_QDC_distributions_run_54")
 
-#title = "100_gev_muon_ds_on_us_on_sipm_on_reco_on_largesipm_cut_11_mc"
-title = "300_gev_pion_ds_off_us_on_sipm_on_reco_on_largesipm_cut_11"
+title = "100_gev_muon_ds_on_us_on_sipm_on_reco_on_largesipm_cut_11_res_cut"
+#title = "300_gev_pion_ds_off_us_on_sipm_on_reco_on_largesipm_cut_11"
 MIP_study(Nev = 1000000, 
    oneUShitperPlane = True, 
    withReco = True, 
-   DSTrack = False, 
+   DSTrack = True, 
    optionTrack = "DS", 
    title = title,
    label = "QDC",
