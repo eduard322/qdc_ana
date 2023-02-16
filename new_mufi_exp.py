@@ -664,7 +664,8 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
 
 
  
- MPVs_raw = [8.43, 8.14, 8.97, 7.32, 9.01]
+ #MPVs_raw = [8.43, 8.14, 8.97, 7.32, 9.01]
+ MPVs_raw = [8.38, 8.16, 8.96, 7.31, 9.01]
  MPVs = {plane: MPVs_raw[i] for i, plane in enumerate([20,21,22,23,24])} 
  MPVs_raw_l = [8.47, 8.93, 7.24, 10.03, 7.9][::-1]
  #MPVs_raw_l = [np.array(MPVs_raw_l).mean() for _ in range(5)]
@@ -685,7 +686,9 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
  hist_list_r = {}
  hist_list_lr = {}
  QDC_list = []
- h_slope =  ROOT.TH2I("slope","slope", 100,-0.5,1.,100,-0.5,1.)
+ h_slope =  ROOT.TH2I("slope","slope;slope_x;slope_y", 100,-0.5,1.,100,-0.5,1.)
+ h_xy_track =  ROOT.TH2I("track_xy","track_xy;x;y", 100,-100,100.,100,-100,100.)
+ h_xy_track_res =  ROOT.TH2I("track_xy_res","track_xy;x;y", 100,-100,100.,100,-100,100.)
  for l in range(20, 25):
     #ut.bookHist(h,'sig_'+str(l),'signal / plane '+str(l),200,0.0,50.)
     h =  ROOT.TH1I("plane" + f"_{l}", "plane" + f"_{l}; {label};", 200, bin_min, bin_max)
@@ -752,7 +755,10 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
         bar = (detID%1000)
 
         # residual cut
-        if ana.residual(theTrack, detID, MuFilter) >= 6.:
+        resx, resy = ana.residual(theTrack, detID, MuFilter, h_xy_track)
+        h_xy_track_res.Fill(resx, resy)
+        res = np.sqrt(resx**2 + resy**2)
+        if res >= 6.:
          continue
 
         if s != 2 : continue
@@ -834,6 +840,8 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
 
  File = ROOT.TFile.Open(f"{options.runNumber}_run_1.root", "RECREATE")
  File.WriteObject(h_slope, h_slope.GetTitle())
+ File.WriteObject(h_xy_track, h_xy_track.GetTitle())
+ File.WriteObject(h_xy_track_res, h_xy_track_res.GetTitle())
  def write_dict_to_file(dict_obj, File):
     for key in dict_obj.keys():
       File.WriteObject(dict_obj[key], dict_obj[key].GetTitle())
@@ -843,6 +851,118 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
  for H in hists_all:
    write_dict_to_file(H, File)
  File.Close()
+
+
+def SiPM_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, DSTrack = True, optionTrack = "DS", title = "US_QDC_distributions", label = "QDC"):
+
+ # veto system 2 layers with 7 bars and 8 sipm channels on both ends
+ # US system 5 layers with 10 bars and 8 sipm channels on both ends
+ # DS system horizontal(3) planes, 60 bars, readout on both sides, single channel
+ #                         vertical(4) planes, 60 bar, readout on top, single channel
+ 
+   bin_min = 0.
+   bin_max = 50.
+   hist_list = {}
+   QDC_list = []
+   h_xy_track =  ROOT.TH2I("track_xy","track_xy;x;y", 100,-100,100.,100,-100,100.)
+   h_slope =  ROOT.TH2I("slope","slope", 100,-0.5,1.,100,-0.5,1.)
+   plane_id = 20
+   bar_id = 209
+   for Si in range(16):
+      h =  ROOT.TH1I("SiPM" + f"_{Si}", "SiPM" + f"_{Si}; {label};", 200, bin_min, bin_max)
+      hist_list[Si] = h
+
+
+   N=-1
+   if Nev < 0 : Nev = eventTree.GetEntries()
+   eventTree.GetEvent(0)
+   #import pdb; pdb.set_trace()
+   for event in eventTree:
+      
+      N+=1
+      if N%options.heartBeat == 0: print('event ',N,' ',time.ctime())
+      if N>Nev: break
+      #print("!!!!1")
+      #if oneUShitperPlane: 
+      if not ana.OneHitUS1(eventTree.Digi_MuFilterHits): continue  
+      #print("!!!!2")
+      if DSTrack:
+         if withReco:
+            for aTrack in Reco_MuonTracks: aTrack.Delete()
+            Reco_MuonTracks.Clear()
+            if optionTrack=='DS': rc = trackTask.ExecuteTask("DS")
+            else                         : rc = trackTask.ExecuteTask("Scifi")
+         #print("!!!!3")
+         if not Reco_MuonTracks.GetEntries()==1:
+            #print(f"{N}: {trackTask.fittedTracks.GetEntries()}") 
+            continue
+         theTrack = Reco_MuonTracks[0]
+         if not theTrack.getFitStatus().isFitConverged() and optionTrack!='DS':   # for H8 where only two planes / proj were avaiable
+               continue
+      # only take horizontal tracks
+         state = theTrack.getFittedState(0)
+         pos   = state.getPos()
+         mom = state.getMom()
+         slopeX= mom.X()/mom.Z()
+         slopeY= mom.Y()/mom.Z()
+         h_slope.Fill(slopeX, slopeY)
+         if abs(slopeX)>0.1: continue   # 4cm distance, 250mrad = 1cm
+         if abs(slopeY)>0.1: continue
+
+
+      for aHit in event.Digi_MuFilterHits:
+         if not aHit.isValid(): continue
+         detID = aHit.GetDetectorID()
+
+            # residual cut
+            # residual cut
+         resx, resy = ana.residual(theTrack, detID, MuFilter, h_xy_track)
+         res = np.sqrt(resx**2 + resy**2)
+         if res >= 6.:
+            continue
+
+         s = detID//10000 # det number (s = 1 -- veto, s = 2 -- US, s = 3 -- DS)
+         l  = (detID%10000)//1000  # plane number
+         bar = (detID%1000)
+
+         if s != 2 : continue
+         if l != 0 : continue
+         if bar != 9 : continue
+         nSiPMs = aHit.GetnSiPMs()
+         nSides  = aHit.GetnSides()
+         allChannels = map2Dict(aHit,'GetAllSignals')
+         for Si in allChannels:
+               qdc_value = allChannels[Si]
+               if qdc_value == -1:
+                  continue
+               hist_list[Si].Fill(qdc_value)
+   #langau fit
+   c  = ROOT.TCanvas("US QDC distribution","US QDC distribution",0,0,1000,1000)
+   c.Divide(4,4)
+   with open("output_par_dsoff_" + str(bar_id), "w") as f:
+      for i, Si in enumerate(hist_list.keys()):
+         c.cd(i+1)
+         res = ana.fit_langau(hist_list[Si], str(Si), bin_min, bin_max)
+         hist_list[Si].Draw()
+         print(bar_id, Si, res, "\n", file = f)
+   c.SaveAs(title + "_qdc" + ".root")
+   c.SaveAs(title + "_qdc" + ".pdf")
+
+
+
+   File = ROOT.TFile.Open(f"{options.runNumber}_run_1.root", "RECREATE")
+   File.WriteObject(h_slope, h_slope.GetTitle())
+   File.WriteObject(h_xy_track, h_xy_track.GetTitle())
+   def write_dict_to_file(dict_obj, File):
+      for key in dict_obj.keys():
+         File.WriteObject(dict_obj[key], dict_obj[key].GetTitle())
+   
+   hists_all = [hist_list]
+   #write_dict_to_file(hist_list, File)
+   for H in hists_all:
+      write_dict_to_file(H, File)
+   File.Close()
+
 
 
 
@@ -929,5 +1049,6 @@ MIP_study(Nev = 1000000,
    sipm_cut = "large111", 
    cut = 11)
 
+# SiPM_study(Nev = -1, oneUShitperPlane = True, withReco = True, DSTrack = True, optionTrack = "DS", title = "SiPM_100_gev_muon_pl_0_bar_9_ds_on_us_on_res_on_all")
 
 # convert_data(10)

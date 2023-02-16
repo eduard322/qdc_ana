@@ -133,13 +133,16 @@ def extrapolate(theTrack,z_mid):
     y=pos.y()+slope_y*(z_mid-pos.z())
     return x,y
 
-def residual(theTrack, detID, MuFilter):
+def residual(theTrack, detID, MuFilter, h_xy_track):
     MuFilter.GetPosition(detID,A,B)
     Z = 0.5*(A[2]+B[2])
     Y = 0.5*(A[1]+B[1])
+    X = 0.5*(A[0]+B[0])
     xEx, yEx = extrapolate(theTrack,Z)
+    h_xy_track.Fill(xEx, yEx)
     resY = yEx-Y
-    return resY
+    resX = xEx-X
+    return resX, resY
 
 
 
