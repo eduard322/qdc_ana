@@ -1418,7 +1418,7 @@ def pid_create_output(Nev = options.nEvents, filename = "default", eos = True):
         nSides  = aHit.GetnSides()
 
         qdc_value = ana.av_qdc(aHit)
-        if qdc_value == -1:
+        if qdc_value == -1 or qdc_value < 3:
             continue
         points = L.wList(detID)
         for p in points:
@@ -1510,7 +1510,7 @@ def pid_create_output(Nev = options.nEvents, filename = "default", eos = True):
 
 #test_multiprocessing(1000)
 
-pid_create_output(10000, "output_300GeV_10k_det_id_onehitUS1")
+pid_create_output(10000, "output_300GeV_10k_det_id_onehitUS1_1_qdc_gt_3", eos = True)
 
 #pid_ana_mc(5000, "langau", "US_QDC_distributions_MC")
 

@@ -8,6 +8,10 @@ Value = ROOT.std.vector('float')()
 verticalBarDict={0:1, 1:3, 2:5, 3:6}
 
 
+def smallSiPMchannel(i):
+    if i==2 or i==5 or i==10 or i==13: return True
+    else: return False
+
 def map2Dict(aHit,T='GetAllSignals',mask=True):
      if T=="SumOfSignals":
         key = Tkey
@@ -88,16 +92,22 @@ def OneHitUS1(DigiHits):
       return False
 
 
-def av_qdc(aHit, cut = 11):
+def av_qdc(aHit, sipm_cut = "all", cut = 11):
     nSiPMs = aHit.GetnSiPMs()
     nSides  = aHit.GetnSides()
     allChannels = map2Dict(aHit,'GetAllSignals')
     channels = [allChannels[c] for c in allChannels]
     ch = 0 
-    for c in allChannels:
-        if allChannels[c] != 0:
-            ch += 1
-    if ch < cut: return -1
+    if sipm_cut == "all":
+        for c in allChannels:
+            if allChannels[c] != 0:
+                ch += 1
+        if ch < cut: return -1
+    else:
+        for c in allChannels:
+            if allChannels[c] != 0 and not smallSiPMchannel(c):
+                ch += 1
+        if ch < cut: return -1
     if nSides==2:
         Sleft    = []
         Sright = []
@@ -110,20 +120,49 @@ def av_qdc(aHit, cut = 11):
     return np.sqrt(np.array(Sleft).mean()*np.array(Sright).mean())
 
 
-def qdc_left_right(aHit):
+
+
+def extrapolate(theTrack,z_mid):
+    state = theTrack.getFittedState()
+    pos = state.getPos()
+    mom = state.getMom()
+    slope_x = mom.x()/mom.z()
+    slope_y = mom.y()/mom.z()
+    x=pos.x()+slope_x*(z_mid-pos.z())
+    y=pos.y()+slope_y*(z_mid-pos.z())
+    return x,y
+
+def residual(theTrack, detID):
+    MuFilter.GetPosition(detID,A,B)
+    Z = 0.5*(A[2]+B[2])
+    Y = 0.5*(A[1]+B[1])
+    xEx, yEx = extrapolate(theTrack,Z)
+    resY = yEx-Y
+    return res
+
+
+
+def qdc_left_right(aHit, sipm_cut = "all", cut = 11):
     nSiPMs = aHit.GetnSiPMs()
     nSides  = aHit.GetnSides()
     allChannels = map2Dict(aHit,'GetAllSignals')
     channels = [allChannels[c] for c in allChannels]
     ch = 0 
-    for c in allChannels:
-        if allChannels[c] != 0:
-            ch += 1
-    if ch < 10: return -1
+    if sipm_cut == "all":
+        for c in allChannels:
+            if allChannels[c] != 0:
+                ch += 1
+        if ch < cut: return -1
+    else:
+        for c in allChannels:
+            if allChannels[c] != 0 and not smallSiPMchannel(c):
+                ch += 1
+        if ch < cut: return -1
     if nSides==2:
         Sleft    = []
         Sright = []
     for c in allChannels:
+        if allChannels[c] == 0: continue
         if  nSiPMs > c:  # left side
                 Sleft.append(allChannels[c])
         else:
@@ -148,6 +187,7 @@ def fit_langau(hist,o,bmin,bmax):
     rc = hist.Fit(F,'S','',bmin,bmax)
     res = rc.Get()
     return res
+
 
 
 def langaufun(x,par):

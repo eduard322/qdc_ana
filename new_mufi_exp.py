@@ -605,16 +605,81 @@ def beamSpot():
 #    return True
 
 
-def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, DSTrack = True, optionTrack = "DS", title = "US_QDC_distributions", label = "QDC"):
+def beamSpot():
+   trackTask.ExecuteTask()
+   Xbar = -10
+   Ybar = -10
+   for  aTrack in Reco_MuonTracks:
+         state = aTrack.getFittedState()
+         pos    = state.getPos()
+         rc = h['bs'].Fill(pos.x(),pos.y())
+         points = aTrack.getPoints()
+         keys     = ROOT.std.vector('int')()
+         detIDs = ROOT.std.vector('int')()
+         ROOT.fixRoot(points, detIDs,keys,True)
+         for k in range(keys.size()):
+             #                                     m = p.getRawMeasurement()
+             detID =detIDs[k] # m.getDetId()
+             key = keys[k]          # m.getHitId()//1000 # for mufi
+             aHit = eventTree.Digi_MuFilterHits[key]
+             if aHit.GetDetectorID() != detID: continue # not a Mufi hit
+             s = detID//10000
+             l  = (detID%10000)//1000  # plane number
+             bar = (detID%1000)
+             if s>2: 
+               l=2*l
+               if bar>59:
+                    bar=bar-60
+                    if l<6: l+=1
+             if s==3 and l%2==0: Ybar=bar
+             if s==3 and l%2==1: Xbar=bar
+             nSiPMs = aHit.GetnSiPMs()
+             nSides  = aHit.GetnSides()
+             for p in range(nSides):
+                 c=bar*nSiPMs*nSides + p*nSiPMs
+                 for i in range(nSiPMs):
+                      signal = aHit.GetSignal(i+p*nSiPMs)
+                      if signal > 0:
+                           rc  = h['Tsig_'+str(s)+str(l)].Fill(signal)
+         mom = state.getMom()
+         slopeY= mom.X()/mom.Z()
+         slopeX= mom.Y()/mom.Z()
+         h['slopes'].Fill(slopeX,slopeY)
+         if not Ybar<0 and not Xbar<0 and abs(slopeY)<0.01: rc = h['bsDS'].Fill(Xbar,Ybar)
+
+
+def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, DSTrack = True, optionTrack = "DS", title = "US_QDC_distributions", label = "QDC", sipm_cut = "all", cut = 11):
 
  # veto system 2 layers with 7 bars and 8 sipm channels on both ends
  # US system 5 layers with 10 bars and 8 sipm channels on both ends
  # DS system horizontal(3) planes, 60 bars, readout on both sides, single channel
  #                         vertical(4) planes, 60 bar, readout on top, single channel
  
- MPVs = [8.43, 8.14, 8.97, 7.32, 9.01]
+ ut.bookHist(h,'bs','beam spot',100,-100.,10.,100,0.,80.)
+ ut.bookHist(h,'bsDS','beam spot',60,-0.5,59.5,60,-0.5,59.5)
+ for s in systemAndPlanes:
+    for l in range(systemAndPlanes[s]):
+      ut.bookHist(h,'Tsig_'+str(s*10+l),'signal / plane '+str(s*10+l),200,0.0,200.)
+ ut.bookHist(h,'slopes','track slopes',100,-0.1,0.1,100,-0.1,0.1)
+
+
+ 
+ MPVs_raw = [8.43, 8.14, 8.97, 7.32, 9.01]
+ MPVs = {plane: MPVs_raw[i] for i, plane in enumerate([20,21,22,23,24])} 
+ MPVs_raw_l = [8.47, 8.93, 7.24, 10.03, 7.9][::-1]
+ #MPVs_raw_l = [np.array(MPVs_raw_l).mean() for _ in range(5)]
+ MPVs_l = {plane: MPVs_raw_l[i] for i, plane in enumerate([20,21,22,23,24])}
+ MPVs_raw_r = [9.50, 6.27, 10.12, 6,18, 9.46]
+ #MPVs_raw_r = [np.array(MPVs_raw_r).mean() for _ in range(5)]
+ MPVs_r = {plane: MPVs_raw_r[i] for i, plane in enumerate([20,21,22,23,24])}
+ 
  bin_min = 0.
- bin_max = 50.
+ if label == "MIP":
+   bin_max = 5.
+   bin_max_ql = 5.
+ else:
+   bin_max = 50.
+   bin_max_ql = 200.
  hist_list = {}
  hist_list_l = {}
  hist_list_r = {}
@@ -628,7 +693,7 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
     h_r =  ROOT.TH1I("plane" + f"_{l}", "plane" + f"_{l}; {label};", 200, bin_min, bin_max)
     hist_list_lr[l] = {}
     for bar in range(10):
-      h_lr =  ROOT.TH2I("plane" + f"_{l}_{bar}_lr", "plane" + f"_{l}_{bar}_lr", 100,-0.5,200.,100,-0.5,200.)
+      h_lr =  ROOT.TH2I("plane" + f"_{l}_{bar}_lr", "plane" + f"_{l}_{bar}_lr; Q_L [{label}]; Q_R [{label}]", 100,-0.5,bin_max_ql,100,-0.5,bin_max_ql)
       hist_list_lr[l][bar] = h_lr
     #h_lr =  ROOT.TH2I("plane" + f"_{l}_lr", "plane" + f"_{l}_lr", 100,-0.5,200.,100,-0.5,200.)
     hist_list[l] = h
@@ -648,7 +713,7 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
  for event in eventTree:
     
     N+=1
-    if N%options.heartBeat == 0: print('event ',N,' ',time.ctime())
+    if N%1000 == 0: print('event ',N,' ',time.ctime())
     if N>Nev: break
     #print("!!!!1")
     #if oneUShitperPlane: 
@@ -678,7 +743,6 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
       if abs(slopeY)>0.1: continue
 
 
-
     for aHit in event.Digi_MuFilterHits:
         if not aHit.isValid(): continue
         detID = aHit.GetDetectorID()
@@ -687,16 +751,24 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
         l  = (detID%10000)//1000  # plane number
         bar = (detID%1000)
 
+        # residual cut
+        if ana.residual(theTrack, detID) >= 6.:
+         continue
+
         if s != 2 : continue
         nSiPMs = aHit.GetnSiPMs()
         nSides  = aHit.GetnSides()
-        qdc_value = ana.av_qdc(aHit)
+        qdc_value = ana.av_qdc(aHit, sipm_cut, cut)
         if qdc_value == -1:
             continue
+        q_l, q_r = ana.qdc_left_right(aHit, sipm_cut, cut)
+        if label == "MIP":
+            qdc_value /= MPVs[s*10 + l]
+            q_l /= MPVs_l[s*10 + l]
+            q_r /= MPVs_r[s*10 + l]
         #QDC_list.append(qdc_value)
         #print(s*10 + l)
         hist_list[s*10 + l].Fill(qdc_value)
-        q_l, q_r = ana.qdc_left_right(aHit)
         hist_list_l[s*10 + l].Fill(q_l)
         hist_list_r[s*10 + l].Fill(q_r)
         hist_list_lr[s*10 + l][bar].Fill(q_l, q_r)
@@ -716,6 +788,19 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
     hist_list[plane].Draw()
  c.SaveAs(title + "_qdc" + ".root")
  c.SaveAs(title + "_qdc" + ".pdf")
+
+ c  = ROOT.TCanvas("Q_L vs. Q_R distribution","Q_L vs. Q_R distribution",0,0,1200,1200)
+ c.Divide(3,4)
+ for i, plane in enumerate(hist_list_lr[23].keys()):
+    #print(i)
+    c.cd(i+1)
+   #  if fit == "langau":
+   #    ana.fit_langau(hist_list[plane], str(plane), bin_min, bin_max)
+   #  else:
+   #    hist_list[plane].Fit("pol5")
+    hist_list_lr[23][i].Draw("COLZ")
+ c.SaveAs(title + "_qlqr" + ".root")
+ c.SaveAs(title + "_qlqr" + ".pdf")
 
  c  = ROOT.TCanvas("US QDC_l distribution","US QDC_l distribution",0,0,1000,1000)
  c.Divide(2,3)
@@ -745,18 +830,7 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
  c.SaveAs(title + "_qdc_r" + ".pdf")
 
 
- c  = ROOT.TCanvas("Q_L vs. Q_R distribution","Q_L vs. Q_R distribution",0,0,1200,1200)
- c.Divide(3,4)
- for i, plane in enumerate(hist_list_lr[23].keys()):
-    #print(i)
-    c.cd(i+1)
-   #  if fit == "langau":
-   #    ana.fit_langau(hist_list[plane], str(plane), bin_min, bin_max)
-   #  else:
-   #    hist_list[plane].Fit("pol5")
-    hist_list_lr[23][i].Draw("COLZ")
- c.SaveAs(title + "_qlqr" + ".root")
- c.SaveAs(title + "_qlqr" + ".pdf")
+
 
  File = ROOT.TFile.Open(f"{options.runNumber}_run_1.root", "RECREATE")
  File.WriteObject(h_slope, h_slope.GetTitle())
@@ -774,7 +848,60 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
 
 
 
+def convert_data(Nev = options.nEvents):
 
+ # veto system 2 layers with 7 bars and 8 sipm channels on both ends
+ # US system 5 layers with 10 bars and 8 sipm channels on both ends
+ # DS system horizontal(3) planes, 60 bars, readout on both sides, single channel
+ #                         vertical(4) planes, 60 bar, readout on top, single channel
+ 
+
+ def add_zeros(channels, LEN = 16):
+   return {key: channels[key] if key in channels.keys() else 0 for key in range(LEN)}
+
+
+ #output = "/eos/user/u/ursovsnd/private/SND_Data/qdc_study/preprocessed_data/"
+ output = ""
+ N=-1
+ if Nev < 0 : Nev = eventTree.GetEntries()
+ eventTree.GetEvent(0)
+ #import pdb; pdb.set_trace()
+ with open(output + "converted_data_muon_100_GeV_H8", "w") as f:
+   for event in eventTree:
+      
+      N+=1
+      if N%options.heartBeat == 0: print('event ',N,' ',time.ctime())
+      if N>Nev: break
+
+      for hit_number, aHit in enumerate(event.Digi_MuFilterHits):
+         if not aHit.isValid(): continue
+         detID = aHit.GetDetectorID()
+
+         s = detID//10000 # det number (s = 1 -- veto, s = 2 -- US, s = 3 -- DS)
+         l  = (detID%10000)//1000  # plane number
+         bar = (detID%1000)
+
+         if s != 2 : continue
+
+
+         allChannels = add_zeros(ana.map2Dict(aHit,'GetAllSignals'))
+         allTimes = add_zeros(ana.map2Dict(aHit,'GetAllTimes'))
+         #print(allChannels)
+         channels = [allChannels[c] if allChannels[c] != 0 else 0 for c in allChannels]
+         times = [allTimes[c] if allTimes[c] != 0 else 0 for c in allTimes]
+         nSiPMs = aHit.GetnSiPMs()
+         print(nSiPMs)
+         # if allTimes[c] != 0 else 0
+         meta_data = [N, hit_number, detID]
+         string_output = ""
+         string_output += "\t".join(list(map(str, meta_data)))
+         string_output += "\t"
+         string_output += "\t".join(list(map(str, channels)))
+         string_output += "\t"
+         string_output += "\t".join(list(map(str, times)))
+         string_output += "\n"
+         
+         f.write(string_output)
 
 
 
@@ -790,5 +917,17 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
 #Mufi_hitMaps(1000)
 #qdc_dist_per_bar(1000000, "langau", "US_QDC_distributions_run_54")
 
-MIP_study(Nev = 1000000, oneUShitperPlane = True, withReco = True, DSTrack = True, optionTrack = "DS", title = "100_gev_muon_ds_on_us_on_sipm_on_reco_on")
+#title = "100_gev_muon_ds_on_us_on_sipm_on_reco_on_largesipm_cut_11_mc"
+title = "300_gev_pion_ds_off_us_on_sipm_on_reco_on_largesipm_cut_11"
+MIP_study(Nev = 1000000, 
+   oneUShitperPlane = True, 
+   withReco = True, 
+   DSTrack = False, 
+   optionTrack = "DS", 
+   title = title,
+   label = "QDC",
+   sipm_cut = "large111", 
+   cut = 11)
 
+
+# convert_data(10)
