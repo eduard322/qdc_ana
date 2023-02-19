@@ -9,6 +9,7 @@ A,B,locA,locB,globA,globB    = ROOT.TVector3(),ROOT.TVector3(),ROOT.TVector3(),R
 verticalBarDict={0:1, 1:3, 2:5, 3:6}
 
 
+
 def smallSiPMchannel(i):
     if i==2 or i==5 or i==10 or i==13: return True
     else: return False
@@ -189,7 +190,7 @@ def fit_langau(hist,o,bmin,bmax):
     F.SetParLimits(3,0,10)
 
     rc = hist.Fit(F,'S','',bmin,bmax)
-    res = rc.Get()
+    res = rc.Get().Parameter(1)
     return res
 
 
