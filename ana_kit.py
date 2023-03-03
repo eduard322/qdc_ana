@@ -94,7 +94,7 @@ def OneHitUS1(DigiHits):
       return False
 
 
-def av_qdc(aHit, sipm_cut = "all", cut = 11):
+def av_qdc(aHit, sipm_cut = "all", cut = 11, MPVs_sipm = {i:0 for i in range(16)}):
     nSiPMs = aHit.GetnSiPMs()
     nSides  = aHit.GetnSides()
     allChannels = map2Dict(aHit,'GetAllSignals')
@@ -116,9 +116,15 @@ def av_qdc(aHit, sipm_cut = "all", cut = 11):
     for c in allChannels:
         if allChannels[c] == 0: continue
         if  nSiPMs > c:  # left side
-                Sleft.append(allChannels[c])
+                if smallSiPMchannel(c):
+                    Sleft.append(allChannels[c] + np.array(list(MPVs_sipm.values())).mean())
+                else:
+                    Sleft.append(allChannels[c] + MPVs_sipm[c])
         else:
-                Sright.append(allChannels[c])
+                if smallSiPMchannel(c):
+                    Sright.append(allChannels[c] + np.array(list(MPVs_sipm.values())).mean())
+                else:
+                    Sright.append(allChannels[c] + MPVs_sipm[c])
     return np.sqrt(np.array(Sleft).mean()*np.array(Sright).mean())
 
 
@@ -147,7 +153,7 @@ def residual(theTrack, detID, MuFilter, h_xy_track):
 
 
 
-def qdc_left_right(aHit, sipm_cut = "all", cut = 11):
+def qdc_left_right(aHit, sipm_cut = "all", cut = 11, MPVs_sipm = []):
     nSiPMs = aHit.GetnSiPMs()
     nSides  = aHit.GetnSides()
     allChannels = map2Dict(aHit,'GetAllSignals')
@@ -169,9 +175,15 @@ def qdc_left_right(aHit, sipm_cut = "all", cut = 11):
     for c in allChannels:
         if allChannels[c] == 0: continue
         if  nSiPMs > c:  # left side
-                Sleft.append(allChannels[c])
+                if smallSiPMchannel(c):
+                    Sleft.append(allChannels[c] + np.array(list(MPVs_sipm.values())).mean())
+                else:
+                    Sleft.append(allChannels[c] + MPVs_sipm[c])
         else:
-                Sright.append(allChannels[c])
+                if smallSiPMchannel(c):
+                    Sright.append(allChannels[c] + np.array(list(MPVs_sipm.values())).mean())
+                else:
+                    Sright.append(allChannels[c] + MPVs_sipm[c])
     return (np.array(Sleft).mean(), np.array(Sright).mean())
 
 def fit_langau(hist,o,bmin,bmax):

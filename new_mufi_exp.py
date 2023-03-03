@@ -648,7 +648,7 @@ def beamSpot():
          if not Ybar<0 and not Xbar<0 and abs(slopeY)<0.01: rc = h['bsDS'].Fill(Xbar,Ybar)
 
 
-def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, DSTrack = True, optionTrack = "DS", title = "US_QDC_distributions", label = "QDC", sipm_cut = "all", cut = 11):
+def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, DSTrack = True, res_cut = True, optionTrack = "DS", title = "US_QDC_distributions", label = "QDC", sipm_cut = "all", cut = 11, convert_sipm = False, fit = False, pion_mc = False):
 
  # veto system 2 layers with 7 bars and 8 sipm channels on both ends
  # US system 5 layers with 10 bars and 8 sipm channels on both ends
@@ -665,18 +665,42 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
 
  
  #MPVs_raw = [8.43, 8.14, 8.97, 7.32, 9.01]
- MPVs_raw = [8.38, 8.16, 8.96, 7.31, 9.01]
+ #MPVs_raw = [8.38, 8.16, 8.96, 7.31, 9.01]
+ if pion_mc:
+   MPVs_raw = [5 for i in range(5)]
+ else:
+   MPVs_raw = [7.97705, 7.90099, 7.96975, 8.14279, 7.98463] 
  MPVs = {plane: MPVs_raw[i] for i, plane in enumerate([20,21,22,23,24])} 
  MPVs_raw_l = [8.47, 8.93, 7.24, 10.03, 7.9][::-1]
+ MPVs_raw_l = MPVs_raw
  #MPVs_raw_l = [np.array(MPVs_raw_l).mean() for _ in range(5)]
  MPVs_l = {plane: MPVs_raw_l[i] for i, plane in enumerate([20,21,22,23,24])}
  MPVs_raw_r = [9.50, 6.27, 10.12, 6,18, 9.46]
+ MPVs_raw_r = MPVs_raw
  #MPVs_raw_r = [np.array(MPVs_raw_r).mean() for _ in range(5)]
  MPVs_r = {plane: MPVs_raw_r[i] for i, plane in enumerate([20,21,22,23,24])}
  
+ if convert_sipm:
+   MPVs_sipm = []
+   with open("sipm_mpvs_full", "r") as f:
+      x = 1
+      while x:
+            x = f.readline().split()
+            if len(x) > 4 or len(x) == 0:
+                  continue
+            MPVs_sipm.append(list(map(int, x[:-1])) + [float(x[-1])])
+   #print(np.array(MPVs_sipm))
+   MPV_median = np.median(np.array(MPVs_sipm)[:,-1])
+   MPVs_sipm = np.array([x[:-1] + [-x[-1] + MPV_median] for x in MPVs_sipm])
+   # print(MPV_median)
+   # print("*********")
+   # print(MPVs_sipm[MPVs_sipm[:,0] == 200])
+   # exit(0)
+
+
  bin_min = 0.
  if label == "MIP":
-   bin_max = 5.
+   bin_max = 250.
    bin_max_ql = 5.
  else:
    bin_max = 50.
@@ -689,6 +713,8 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
  hist_list_sipm = {}
 
  QDC_list = []
+ h_qdc_hit = ROOT.TH2I("qdc_vs_hit","QDC vs. Number of fired bars;Number of fired bars;QDC [MIP]", 100,0,50.,100,0,200)
+ h_qdc_hit_norm = ROOT.TH2I("qdc_vs_hit_norm","QDC/Ntot vs. Number of fired bars;Number of fired bars;Etot/Ntot [MIP]", 100,0,50.,100,0,25)
  h_slope =  ROOT.TH2I("slope","slope;slope_x;slope_y", 100,-0.5,1.,100,-0.5,1.)
  h_xy_track =  ROOT.TH2I("track_xy","track_xy;x;y", 100,-100,100.,100,-100,100.)
  h_xy_track_res =  ROOT.TH2I("track_xy_res","track_xy_res;x;y", 100,-100,100.,100,-100,100.)
@@ -757,7 +783,8 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
       if abs(slopeY)>0.1: continue
       h_xy_track_slope_abs.Fill(mom.x()/mom.Mag(),mom.y()/mom.Mag())
 
-
+    number_of_hits = 0
+    qdc_per_event = 0
     for aHit in event.Digi_MuFilterHits:
         if not aHit.isValid(): continue
         detID = aHit.GetDetectorID()
@@ -766,28 +793,44 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
         l  = (detID%10000)//1000  # plane number
         bar = (detID%1000)
 
-        # residual cut
-
-
         if s != 2 : continue
-        resx, resy = ana.residual(theTrack, detID, MuFilter, h_xy_track)
-        h_xy_track_res.Fill(resx, resy)
-        #res = np.sqrt(resx**2 + resy**2)
-        res = np.abs(resy)
-        if res >= 6.:
-         continue
+        if res_cut:
+         resx, resy = ana.residual(theTrack, detID, MuFilter, h_xy_track)
+         h_xy_track_res.Fill(resx, resy)
+         #res = np.sqrt(resx**2 + resy**2)
+         res = np.abs(resy)
+         if res >= 6.:
+            continue
         nSiPMs = aHit.GetnSiPMs()
         nSides  = aHit.GetnSides()
+      ####################
+        if convert_sipm:
+         MPVs_sipm_slice = MPVs_sipm[MPVs_sipm[:,0] == (s*10 + l)*10 + bar]
+         #print((s*10 + l)*10 + bar)
+         sipm_ids = MPVs_sipm_slice[:, 1]
+         shift_coef = MPVs_sipm_slice[:, -1]
+         MPVs_sipm_slice = {int(key): shift_coef[i] for i, key in enumerate(sipm_ids)}
+        else:
+         MPVs_sipm_slice = {i:0 for i in range(16)}
+        #print(MPVs_sipm_slice)
+      ####################
+        qdc_value = ana.av_qdc(aHit, sipm_cut, cut, MPVs_sipm_slice)
+      #   if pion_mc:
+      #    if qdc_value < 2.:
+      #       continue
+        if qdc_value == -1:
+            continue
+
         allChannels = map2Dict(aHit,'GetAllSignals')
         for Si in allChannels:
-               qdc_1 = allChannels[Si]
+               if smallSiPMchannel(Si):
+                  qdc_1 = allChannels[Si] + np.array(list(MPVs_sipm_slice.values())).mean()
+               else:
+                  qdc_1 = allChannels[Si] + MPVs_sipm_slice[Si]
                if qdc_1 == -1:
                   continue
                hist_list_sipm[s*10 + l][bar][Si].Fill(qdc_1)
-        qdc_value = ana.av_qdc(aHit, sipm_cut, cut)
-        if qdc_value == -1:
-            continue
-        q_l, q_r = ana.qdc_left_right(aHit, sipm_cut, cut)
+        q_l, q_r = ana.qdc_left_right(aHit, sipm_cut, cut, MPVs_sipm_slice)
         if label == "MIP":
             qdc_value /= MPVs[s*10 + l]
             q_l /= MPVs_l[s*10 + l]
@@ -799,9 +842,23 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
         hist_list_r[s*10 + l].Fill(q_r)
         hist_list_lr[s*10 + l][bar].Fill(q_l, q_r)
         hist_list_bar[s*10 + l][bar].Fill(qdc_value)
+        qdc_per_event += qdc_value
+        number_of_hits += 1 
+    if number_of_hits > 0:
+      h_qdc_hit.Fill(number_of_hits, qdc_per_event)
+      h_qdc_hit_norm.Fill(number_of_hits, qdc_per_event/(number_of_hits))  
 
- File = ROOT.TFile.Open(f"{options.runNumber}_run_2.root", "RECREATE")
 
+ File = ROOT.TFile.Open(f"{title}_{options.runNumber}_run_2_test.root", "RECREATE")
+
+ c  = ROOT.TCanvas("QDC vs. NOH","QDC vs. NOH",0,0,1000,1000)
+ ROOT.gPad.SetLogz()
+ h_qdc_hit.Draw('colz')
+ c.Write()
+ c  = ROOT.TCanvas("QDC/NOH vs. NOH","QDC/NOH vs. NOH",0,0,1000,1000)
+ ROOT.gPad.SetLogz()
+ h_qdc_hit_norm.Draw('colz')
+ c.Write()
 
  c  = ROOT.TCanvas("US QDC distribution","US QDC distribution",0,0,1000,1000)
  c.Divide(2,3)
@@ -829,7 +886,7 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
  c.Divide(2,3)
  for i, plane in enumerate(hist_list_l.keys()):
     c.cd(i+1)
-    ana.fit_langau(hist_list_l[plane], str(plane), bin_min, bin_max)
+    #ana.fit_langau(hist_list_l[plane], str(plane), bin_min, bin_max)
     hist_list_l[plane].Draw()
  c.Write()
 #  c.SaveAs(title + "_qdc_l" + ".root")
@@ -840,7 +897,7 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
  c.Divide(2,3)
  for i, plane in enumerate(hist_list_r.keys()):
     c.cd(i+1)
-    ana.fit_langau(hist_list_r[plane], str(plane), bin_min, bin_max)
+    #ana.fit_langau(hist_list_r[plane], str(plane), bin_min, bin_max)
     hist_list_r[plane].Draw()
  c.Write()
 #  c.SaveAs(title + "_qdc_r" + ".root")
@@ -854,22 +911,24 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
       c.Divide(3,4)
       for i, br in enumerate(hist_list_bar[pl].keys()):
          c.cd(i+1)
-         res = ana.fit_langau(hist_list_bar[pl][br], str(pl*10 + br), bin_min, bin_max)
-         mpv_bars.append(res)
-         barID.append(pl*10 + br)
-         print(pl*10 + br, res, file = f)
+         if fit:
+            res = ana.fit_langau(hist_list_bar[pl][br], str(pl*10 + br), bin_min, bin_max)
+            mpv_bars.append(res)
+            barID.append(pl*10 + br)
+            print(pl*10 + br, res, file = f)
          hist_list_bar[pl][br].Draw("COLZ")
       c.Write()
  
- c = ROOT.TCanvas("Bar mpvs", "Bar mpvs", 1000, 1000)
- gr = ROOT.TGraph(len(barID), array("d", barID), array("d", mpv_bars))
- gr.SetMarkerStyle(23)
- gr.SetMarkerColor(ROOT.kBlue)
- gr.GetXaxis().SetTitle("barID")
- gr.GetYaxis().SetTitle("MPVs [QDC]")
- gr.SetTitle("Bar MPVs")
- gr.Draw("AP")
- c.Write()
+ if fit:
+   c = ROOT.TCanvas("Bar mpvs", "Bar mpvs", 1000, 1000)
+   gr = ROOT.TGraph(len(barID), array("d", barID), array("d", mpv_bars))
+   gr.SetMarkerStyle(23)
+   gr.SetMarkerColor(ROOT.kBlue)
+   gr.GetXaxis().SetTitle("barID")
+   gr.GetYaxis().SetTitle("MPVs [QDC]")
+   gr.SetTitle("Bar MPVs")
+   gr.Draw("AP")
+   c.Write()
 
 
 
@@ -885,25 +944,26 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
          for i, Si in enumerate(hist_list_sipm[pl][br].keys()):
             c.cd(i+1)
             if not smallSiPMchannel(Si):
-               res = ana.fit_langau(hist_list_sipm[pl][br][Si], str(Si), bin_min, bin_max)
-               sipmID.append(k_sipm)
-               mpv_sipms.append(res)
-               print(pl*10 + br, Si, k_sipm, res, file = f)
+               if fit:
+                  res = ana.fit_langau(hist_list_sipm[pl][br][Si], str(Si), bin_min, bin_max)
+                  sipmID.append(k_sipm)
+                  mpv_sipms.append(res)
+                  print(pl*10 + br, Si, k_sipm, res, file = f)
             hist_list_sipm[pl][br][Si].Draw()           
             k_sipm += 1
          c.Write()
          
          
-
- c = ROOT.TCanvas("SiPM mpvs", "SiPM mpvs", 1000, 1000)
- gr = ROOT.TGraph(len(sipmID), array("d", sipmID), array("d", mpv_sipms))
- gr.SetMarkerStyle(23)
- gr.SetMarkerColor(ROOT.kBlue)
- gr.GetXaxis().SetTitle("SiPMID")
- gr.GetYaxis().SetTitle("MPVs [QDC]")
- gr.SetTitle("SiPM MPVs")
- gr.Draw("AP")
- c.Write()
+ if fit:
+   c = ROOT.TCanvas("SiPM mpvs", "SiPM mpvs", 1000, 1000)
+   gr = ROOT.TGraph(len(sipmID), array("d", sipmID), array("d", mpv_sipms))
+   gr.SetMarkerStyle(23)
+   gr.SetMarkerColor(ROOT.kBlue)
+   gr.GetXaxis().SetTitle("SiPMID")
+   gr.GetYaxis().SetTitle("MPVs [QDC]")
+   gr.SetTitle("SiPM MPVs")
+   gr.Draw("AP")
+   #c.Write()
 
 
 
@@ -1135,17 +1195,25 @@ def convert_data(Nev = options.nEvents, oneUShitperPlane = True, withReco = True
 #Mufi_hitMaps(1000)
 #qdc_dist_per_bar(1000000, "langau", "US_QDC_distributions_run_54")
 
-title = "100_gev_muon_ds_on_us_on_sipm_on_reco_on_largesipm_cut_11_res_cut"
-#title = "300_gev_pion_ds_off_us_on_sipm_on_reco_on_largesipm_cut_11"
-MIP_study(Nev = -1, 
-   oneUShitperPlane = True, 
-   withReco = True, 
-   DSTrack = True, 
+#title = "100_gev_muon_ds_on_us_on_sipm_on_reco_on_largesipm_cut_11_res_cut"
+# title = "300_gev_pion_ds_off_us_on_sipm_on_reco_on_largesipm_cut_11_test"
+# title = "pion_mc_pe_conversion"
+# title = "muon_100_gev_H8_no_cut"
+title = "pion_mc_no_cut_pe_saturation_2_low_cut"
+# title = "pion_300_H8_large_scale"
+cut_key = False
+MIP_study(Nev = 10000, 
+   oneUShitperPlane = cut_key, 
+   withReco = cut_key, 
+   DSTrack = cut_key,
+   res_cut = cut_key, 
    optionTrack = "DS", 
    title = title,
-   label = "QDC",
+   label = "MIP",
    sipm_cut = "large111", 
-   cut = 11)
+   cut = 11,
+   convert_sipm = False,
+   pion_mc = True)
 
 # SiPM_study(Nev = -1, oneUShitperPlane = True, withReco = True, DSTrack = True, optionTrack = "DS", title = "SiPM_100_gev_muon_pl_0_bar_9_ds_on_us_on_res_on_all")
 
