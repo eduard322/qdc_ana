@@ -648,7 +648,11 @@ def beamSpot():
          if not Ybar<0 and not Xbar<0 and abs(slopeY)<0.01: rc = h['bsDS'].Fill(Xbar,Ybar)
 
 
-def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, DSTrack = True, res_cut = True, optionTrack = "DS", title = "US_QDC_distributions", label = "QDC", sipm_cut = "all", cut = 11, convert_sipm = False, fit = False, pion_mc = False):
+
+
+# def get_absolute_time(time_sipm, t0, event):
+
+def MIP_study(Nev_st = 0, Nev_en = 1, oneUShitperPlane = True, withReco = False, DSTrack = True, res_cut = True, optionTrack = "DS", title = "US_QDC_distributions", label = "QDC", sipm_cut = "all", cut = 11, convert_sipm = False, fit = False, pion_mc = False):
 
  # veto system 2 layers with 7 bars and 8 sipm channels on both ends
  # US system 5 layers with 10 bars and 8 sipm channels on both ends
@@ -661,6 +665,19 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
 #     for l in range(systemAndPlanes[s]):
 #       ut.bookHist(h,'Tsig_'+str(s*10+l),'signal / plane '+str(s*10+l),200,0.0,200.)
 #  ut.bookHist(h,'slopes','track slopes',100,-0.1,0.1,100,-0.1,0.1)
+
+
+# need to make extra gymnastiques since absolute time is missing
+ Ntinter = []
+ N = 0
+ for f in eventTree.GetListOfFiles():
+   dN =  f.GetEntries()
+   rc = eventTree.GetEvent(N)
+   t0 = eventTree.EventHeader.GetEventTime()/freq
+   rc = eventTree.GetEvent(N+dN-1)
+   tmax = eventTree.EventHeader.GetEventTime()/freq
+   Ntinter.append([t0,tmax])
+   N+=dN
 
 
  
@@ -700,65 +717,95 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
 
  bin_min = 0.
  if label == "MIP":
-   bin_max = 250.
+   bin_max = 200.
    bin_max_ql = 5.
  else:
    bin_max = 50.
    bin_max_ql = 200.
- hist_list = {}
- hist_list_l = {}
- hist_list_r = {}
- hist_list_lr = {}
- hist_list_bar = {}
- hist_list_sipm = {}
 
+
+
+
+
+
+   
+ hist_list = {l: ROOT.TH1I("plane" + f"_{l}", "plane" + f"_{l}; {label};", 200, bin_min, bin_max) for l in range(20, 25)}
+ hist_list_l = {l: ROOT.TH1I("plane" + f"_{l}", "plane" + f"_{l}; {label};", 200, bin_min, bin_max) for l in range(20, 25)}
+ hist_list_r = {l: ROOT.TH1I("plane" + f"_{l}", "plane" + f"_{l}; {label};", 200, bin_min, bin_max) for l in range(20, 25)}
+ hist_list_lr = {l: {bar: ROOT.TH2I("plane" + f"_{l}_{bar}_lr", "plane" + f"_{l}_{bar}_lr; Q_L [{label}]; Q_R [{label}]", 100,-0.5,bin_max_ql,100,-0.5,bin_max_ql) for bar in range(10)} for l in range(20, 25)}
+ hist_list_bar = {l: {bar: ROOT.TH1I("plane" + f"_{l}_{bar}", "plane" + f"_{l}_{bar}; {label};", 200, bin_min, bin_max) for bar in range(10)} for l in range(20, 25)}
+ hist_list_sipm = {l: {bar: {sipm: ROOT.TH1I("plane" + f"_{l}_{bar}_{sipm}", "plane" + f"_{l}_{bar}_{sipm}; {label};", 200, bin_min, bin_max) for sipm in range(16)} for bar in range(10)} for l in range(20, 25)}
+ hist_list_sipm_time = {l: {bar: {sipm: ROOT.TH1I("time_plane" + f"_{l}_{bar}_{sipm}", "plane" + f"_{l}_{bar}_{sipm}; Time [ns];", 200, 0., 50.) for sipm in range(16)} for bar in range(10)} for l in range(20, 25)}
+ hist_list_sipm_time_abs = {l: {bar: {sipm: ROOT.TH1I("time_abs_plane" + f"_{l}_{bar}_{sipm}", "plane" + f"_{l}_{bar}_{sipm}; Abs_Time [ns];", 200, 0., 2000.) for sipm in range(16)} for bar in range(10)} for l in range(20, 25)}
+ hist_list_sipm_time_mean = {l: {bar: {sipm: ROOT.TH1I("time_mean_plane" + f"_{l}_{bar}_{sipm}", "plane" + f"_{l}_{bar}_{sipm}; <Time> [ns];", 200, 0., 50.) for sipm in range(16)} for bar in range(10)} for l in range(20, 25)}
  QDC_list = []
  h_qdc_hit = ROOT.TH2I("qdc_vs_hit","QDC vs. Number of fired bars;Number of fired bars;QDC [MIP]", 100,0,50.,100,0,200)
  h_qdc_hit_norm = ROOT.TH2I("qdc_vs_hit_norm","QDC/Ntot vs. Number of fired bars;Number of fired bars;Etot/Ntot [MIP]", 100,0,50.,100,0,25)
+ h_qdc_hit_time = ROOT.TH2I("qdc_vs_hit_time","QDC vs. Number of fired bars;Number of fired bars;QDC [MIP]", 100,0,50.,100,0,200)
+ h_qdc_hit_norm_time = ROOT.TH2I("qdc_vs_hit_norm_time","QDC/Ntot vs. Number of fired bars;Number of fired bars;Etot/Ntot [MIP]", 100,0,50.,100,0,25)
  h_slope =  ROOT.TH2I("slope","slope;slope_x;slope_y", 100,-0.5,1.,100,-0.5,1.)
  h_xy_track =  ROOT.TH2I("track_xy","track_xy;x;y", 100,-100,100.,100,-100,100.)
  h_xy_track_res =  ROOT.TH2I("track_xy_res","track_xy_res;x;y", 100,-100,100.,100,-100,100.)
  h_xy_track_slope_abs =  ROOT.TH2I("track_xy_slope_abs","track_xy_slope_abs;x;y", 100,-1,1.,100,-1,1.)
- for l in range(20, 25):
-    #ut.bookHist(h,'sig_'+str(l),'signal / plane '+str(l),200,0.0,50.)
-    h =  ROOT.TH1I("plane" + f"_{l}", "plane" + f"_{l}; {label};", 200, bin_min, bin_max)
-    h_l =  ROOT.TH1I("plane" + f"_{l}", "plane" + f"_{l}; {label};", 200, bin_min, bin_max)
-    h_r =  ROOT.TH1I("plane" + f"_{l}", "plane" + f"_{l}; {label};", 200, bin_min, bin_max)
-    hist_list_lr[l] = {}
-    hist_list_bar[l] = {}
-    hist_list_sipm[l] = {}
-    for bar in range(10):
-      h_lr =  ROOT.TH2I("plane" + f"_{l}_{bar}_lr", "plane" + f"_{l}_{bar}_lr; Q_L [{label}]; Q_R [{label}]", 100,-0.5,bin_max_ql,100,-0.5,bin_max_ql)
-      h_bar =  ROOT.TH1I("plane" + f"_{l}_{bar}", "plane" + f"_{l}_{bar}; {label};", 200, bin_min, bin_max)
-      hist_list_lr[l][bar] = h_lr
-      hist_list_bar[l][bar] = h_bar
-      hist_list_sipm[l][bar] = {}
-      for sipm in range(16):
-         h_sipm =  ROOT.TH1I("plane" + f"_{l}_{bar}_{sipm}", "plane" + f"_{l}_{bar}_{sipm}; {label};", 200, bin_min, bin_max)
-         hist_list_sipm[l][bar][sipm] = h_sipm
-    #h_lr =  ROOT.TH2I("plane" + f"_{l}_lr", "plane" + f"_{l}_lr", 100,-0.5,200.,100,-0.5,200.)
-    hist_list[l] = h
-    hist_list_l[l] = h_l
-    hist_list_r[l] = h_r
-    #hist_list_lr[l] = h_lr
+
+
+
+
 
 
 
 
 
  N=-1
- if Nev < 0 : Nev = eventTree.GetEntries()
+ if Nev_en < 0 : Nev_en = eventTree.GetEntries()
+ global Tprev
+ Tprev  = 0
+ Toffset = 0
  eventTree.GetEvent(0)
- #import pdb; pdb.set_trace()
+
+
+ def get_time(N, event):
+    global Tprev
+    eventTree.GetEvent(N)
+    T   = eventTree.EventHeader.GetEventTime()
+    dT = T-Tprev
+    if N > 0 and T > 0:
+      Event_time = (T+Toffset)/freq-t0
+    else:
+      Event_time = T/freq-t0
+    Tprev = T
+    Event_time *= 10e9
+    return Event_time 
+
+
+ def find_overlaps(time_collected, time_gap = 100.):
+   common_sipms = set(time_collected[0].keys()).intersection(time_collected[1].keys()).intersection(time_collected[2].keys())
+   num_of_overlaps = 0
+   for sipm in common_sipms:
+      if np.abs(time_collected[1] - time_collected[0]) < time_gap/2 or np.abs(time_collected[1] - time_collected[2]) < time_gap/2:
+         num_of_overlaps += 1
+
+   return num_of_overlaps
+ time_collected = {}
+ sipm_overlaps = 0
  for event in eventTree:
-    
     N+=1
+    if N <= Nev_st - 1: continue 
     if N%1000 == 0: print('event ',N,' ',time.ctime())
-    if N>Nev: break
-    #print("!!!!1")
-    #if oneUShitperPlane: 
+    if N >= Nev_en + 1: break
+
+
+    Event_time = get_time(N-1, eventTree)
+   #  T   = event.EventHeader.GetEventTime()
+   #  dT = T-Tprev
+   #  if N > 0 and T > 0:
+   #    Event_time = (T+Toffset)/freq-t0
+   #  else:
+   #    Event_time = T/freq-t0
+   #  Tprev = T
+   #  Event_time *= 10e9
+
     if not ana.OneHitUS1(eventTree.Digi_MuFilterHits): continue  
-    #print("!!!!2")
     if DSTrack:
       if withReco:
          for aTrack in Reco_MuonTracks: aTrack.Delete()
@@ -785,6 +832,9 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
 
     number_of_hits = 0
     qdc_per_event = 0
+    number_of_hits_time = 0
+    qdc_per_event_time = 0
+    time_collected[(N - 1) % 3] = []
     for aHit in event.Digi_MuFilterHits:
         if not aHit.isValid(): continue
         detID = aHit.GetDetectorID()
@@ -821,7 +871,11 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
         if qdc_value == -1:
             continue
 
+
+            
         allChannels = map2Dict(aHit,'GetAllSignals')
+        allTimes = aHit.GetAllTimes()
+        time_collected_hit = {}
         for Si in allChannels:
                if smallSiPMchannel(Si):
                   qdc_1 = allChannels[Si] + np.array(list(MPVs_sipm_slice.values())).mean()
@@ -830,6 +884,32 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
                if qdc_1 == -1:
                   continue
                hist_list_sipm[s*10 + l][bar][Si].Fill(qdc_1)
+               hist_list_sipm_time[s*10 + l][bar][Si].Fill(allTimes[Si])
+               hist_list_sipm_time_abs[s*10 + l][bar][Si].Fill(Event_time + allTimes[Si])
+               time_collected_hit[Si] = Event_time + allTimes[Si]
+        time_collected[(N - 1) % 3].append(time_collected_hit)
+         
+
+         # ev_next = get_time(N, eventTree)
+         # for Si in allChannels:
+         #       if smallSiPMchannel(Si):
+         #          qdc_1 = allChannels[Si] + np.array(list(MPVs_sipm_slice.values())).mean()
+         #       else:
+         #          qdc_1 = allChannels[Si] + MPVs_sipm_slice[Si]
+         #       if qdc_1 == -1:
+         #          continue
+         #       if  ev_next + allTimes[Si]
+         #       ev_next = get_time(N, eventTree)
+         #       ev_prev = get_time(N-2, eventTree)
+         #       ev_curr = get_time(N-1, eventTree)
+               # ev_next = eventTree.GetEvent(N)
+               # ev_prev = eventTree.GetEvent(N-2)
+               # ev_curr = eventTree.GetEvent(N-1)
+               # if s*10 + l == 22 and bar == 6:
+               #    # pass
+               #    #######
+               #    print(f"Event: {N}, Plane: {s*10 + l}, Bar: {bar}, SiPM: {Si}, Time: {allTimes[Si]}, Time_abs: {Event_time + allTimes[Si]}, Signal: {qdc_1}")
+               #    #######
         q_l, q_r = ana.qdc_left_right(aHit, sipm_cut, cut, MPVs_sipm_slice)
         if label == "MIP":
             qdc_value /= MPVs[s*10 + l]
@@ -842,12 +922,22 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
         hist_list_r[s*10 + l].Fill(q_r)
         hist_list_lr[s*10 + l][bar].Fill(q_l, q_r)
         hist_list_bar[s*10 + l][bar].Fill(qdc_value)
+
         qdc_per_event += qdc_value
         number_of_hits += 1 
     if number_of_hits > 0:
       h_qdc_hit.Fill(number_of_hits, qdc_per_event)
       h_qdc_hit_norm.Fill(number_of_hits, qdc_per_event/(number_of_hits))  
-
+   
+      # fill mean time hists
+      for pl in hist_list_sipm:
+         for bar in hist_list_sipm[pl]:
+            for si in hist_list_sipm[pl][bar]:
+               hist_list_sipm_time_mean[pl][bar][si].Fill(hist_list_sipm[pl][bar][si].GetMean())
+   
+    if len(time_collected.keys()) == 3:
+      print(time_collected.keys())
+      sipm_overlaps += find_overlaps(time_collected)
 
  File = ROOT.TFile.Open(f"{title}_{options.runNumber}_run_2_test.root", "RECREATE")
 
@@ -949,9 +1039,42 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
                   sipmID.append(k_sipm)
                   mpv_sipms.append(res)
                   print(pl*10 + br, Si, k_sipm, res, file = f)
-            hist_list_sipm[pl][br][Si].Draw()           
+            hist_list_sipm[pl][br][Si].Draw()
+            hist_list_sipm_time[pl][br][Si].Draw()           
             k_sipm += 1
          c.Write()
+   for pl in hist_list_sipm.keys():
+      for br in hist_list_sipm[pl].keys():
+         c  = ROOT.TCanvas(f"US QDC SiPM-Time distribution. Bar {pl*10 + br}", f"US QDC distribution. Bar {pl*10 + br}",0,0,1000,1000)
+         c.Divide(4,4)
+         #with open("output_par_dsoff_" + str(bar_id), "w") as f:
+         for i, Si in enumerate(hist_list_sipm[pl][br].keys()):
+            c.cd(i+1)
+            hist_list_sipm_time[pl][br][Si].Draw()           
+         c.Write()
+   for pl in hist_list_sipm.keys():
+      for br in hist_list_sipm[pl].keys():
+         c  = ROOT.TCanvas(f"US QDC SiPM-AbsTime distribution. Bar {pl*10 + br}", f"US QDC distribution. Bar {pl*10 + br}",0,0,1000,1000)
+         c.Divide(4,4)
+         #with open("output_par_dsoff_" + str(bar_id), "w") as f:
+         for i, Si in enumerate(hist_list_sipm[pl][br].keys()):
+            c.cd(i+1)
+            hist_list_sipm_time_abs[pl][br][Si].Draw()           
+         c.Write()
+   for pl in hist_list_sipm.keys():
+      for br in hist_list_sipm[pl].keys():
+         c  = ROOT.TCanvas(f"US QDC SiPM-<Time> distribution. Bar {pl*10 + br}", f"US QDC distribution. Bar {pl*10 + br}",0,0,1000,1000)
+         c.Divide(4,4)
+         #with open("output_par_dsoff_" + str(bar_id), "w") as f:
+         for i, Si in enumerate(hist_list_sipm[pl][br].keys()):
+            c.cd(i+1)
+            hist_list_sipm_time_mean[pl][br][Si].Draw()           
+         c.Write()
+   
+
+   print("NUMBER OF SIPMS:", sipm_overlaps)
+            
+         
          
          
  if fit:
@@ -981,117 +1104,6 @@ def MIP_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, 
 #  for H in hists_all:
 #    write_dict_to_file(H, File)
  File.Close()
-
-
-def SiPM_study(Nev = options.nEvents, oneUShitperPlane = True, withReco = False, DSTrack = True, optionTrack = "DS", title = "US_QDC_distributions", label = "QDC"):
-
- # veto system 2 layers with 7 bars and 8 sipm channels on both ends
- # US system 5 layers with 10 bars and 8 sipm channels on both ends
- # DS system horizontal(3) planes, 60 bars, readout on both sides, single channel
- #                         vertical(4) planes, 60 bar, readout on top, single channel
- 
-   bin_min = 0.
-   bin_max = 50.
-   hist_list = {}
-   QDC_list = []
-   h_xy_track =  ROOT.TH2I("track_xy","track_xy;x;y", 100,-100,100.,100,-100,100.)
-   h_slope =  ROOT.TH2I("slope","slope", 100,-0.5,1.,100,-0.5,1.)
-   plane_id = 20
-   bar_id = 209
-   for Si in range(16):
-      h =  ROOT.TH1I("SiPM" + f"_{Si}", "SiPM" + f"_{Si}; {label};", 200, bin_min, bin_max)
-      hist_list[Si] = h
-
-
-   N=-1
-   if Nev < 0 : Nev = eventTree.GetEntries()
-   eventTree.GetEvent(0)
-   #import pdb; pdb.set_trace()
-   for event in eventTree:
-      
-      N+=1
-      if N%options.heartBeat == 0: print('event ',N,' ',time.ctime())
-      if N>Nev: break
-      #print("!!!!1")
-      #if oneUShitperPlane: 
-      if not ana.OneHitUS1(eventTree.Digi_MuFilterHits): continue  
-      #print("!!!!2")
-      if DSTrack:
-         if withReco:
-            for aTrack in Reco_MuonTracks: aTrack.Delete()
-            Reco_MuonTracks.Clear()
-            if optionTrack=='DS': rc = trackTask.ExecuteTask("DS")
-            else                         : rc = trackTask.ExecuteTask("Scifi")
-         #print("!!!!3")
-         if not Reco_MuonTracks.GetEntries()==1:
-            #print(f"{N}: {trackTask.fittedTracks.GetEntries()}") 
-            continue
-         theTrack = Reco_MuonTracks[0]
-         if not theTrack.getFitStatus().isFitConverged() and optionTrack!='DS':   # for H8 where only two planes / proj were avaiable
-               continue
-      # only take horizontal tracks
-         state = theTrack.getFittedState(0)
-         pos   = state.getPos()
-         mom = state.getMom()
-         slopeX= mom.X()/mom.Z()
-         slopeY= mom.Y()/mom.Z()
-         h_slope.Fill(slopeX, slopeY)
-         if abs(slopeX)>0.1: continue   # 4cm distance, 250mrad = 1cm
-         if abs(slopeY)>0.1: continue
-
-
-      for aHit in event.Digi_MuFilterHits:
-         if not aHit.isValid(): continue
-         detID = aHit.GetDetectorID()
-
-            # residual cut
-            # residual cut
-         resx, resy = ana.residual(theTrack, detID, MuFilter, h_xy_track)
-         res = np.sqrt(resx**2 + resy**2)
-         if res >= 6.:
-            continue
-
-         s = detID//10000 # det number (s = 1 -- veto, s = 2 -- US, s = 3 -- DS)
-         l  = (detID%10000)//1000  # plane number
-         bar = (detID%1000)
-
-         if s != 2 : continue
-         if l != 0 : continue
-         if bar != 9 : continue
-         nSiPMs = aHit.GetnSiPMs()
-         nSides  = aHit.GetnSides()
-         allChannels = map2Dict(aHit,'GetAllSignals')
-         for Si in allChannels:
-               qdc_value = allChannels[Si]
-               if qdc_value == -1:
-                  continue
-               hist_list[Si].Fill(qdc_value)
-   #langau fit
-   c  = ROOT.TCanvas("US QDC distribution","US QDC distribution",0,0,1000,1000)
-   c.Divide(4,4)
-   with open("output_par_dsoff_" + str(bar_id), "w") as f:
-      for i, Si in enumerate(hist_list.keys()):
-         c.cd(i+1)
-         res = ana.fit_langau(hist_list[Si], str(Si), bin_min, bin_max)
-         hist_list[Si].Draw()
-         print(bar_id, Si, res, "\n", file = f)
-   c.SaveAs(title + "_qdc" + ".root")
-   c.SaveAs(title + "_qdc" + ".pdf")
-
-
-
-   File = ROOT.TFile.Open(f"{options.runNumber}_run_1.root", "RECREATE")
-   File.WriteObject(h_slope, h_slope.GetTitle())
-   File.WriteObject(h_xy_track, h_xy_track.GetTitle())
-   def write_dict_to_file(dict_obj, File):
-      for key in dict_obj.keys():
-         File.WriteObject(dict_obj[key], dict_obj[key].GetTitle())
-   
-   hists_all = [hist_list]
-   #write_dict_to_file(hist_list, File)
-   for H in hists_all:
-      write_dict_to_file(H, File)
-   File.Close()
 
 
 
@@ -1184,6 +1196,336 @@ def convert_data(Nev = options.nEvents, oneUShitperPlane = True, withReco = True
 
 
 
+def TimeStudy(Nev=options.nEvents,withDisplay=False):
+ File = ROOT.TFile.Open(f"time_{options.runNumber}_run_2_test.root", "RECREATE")
+ if Nev < 0 : Nev = eventTree.GetEntries()
+ ut.bookHist(h,'UStime','UStime;Time [ns];',1000,0.,50.)
+ ut.bookHist(h,'DStime','DStime;Time [ns];',1000,0.,50.)
+ ut.bookHist(h,'Stime','Stime',1000,0.,50.)
+ ut.bookHist(h,'UStime_mean','mean US time; <Time> [ns];',200,0.,50.)
+ ut.bookHist(h,'DStime_mean','mean DS time; <Time> [ns];',200,0.,50.)
+#  ut.bookHist(h,'VEvsUStime','; mean US time [ns];mean VE time [ns]',100,0.,50.,100,0.,50.)
+#  ut.bookCanvas(h,'T','',900,1200,1,2)
+ c  = ROOT.TCanvas('T','',0,0,1000,1000)
+ c.Divide(1,2)
+ c.cd(1)
+ h['UStime'].SetLineColor(ROOT.kGreen)
+ h['DStime'].SetLineColor(ROOT.kRed)
+ N=-1
+ for event in eventTree:
+   N+=1
+   if N%1000 == 0: print('event ',N,' ',time.ctime())
+   if N>Nev: break
+   for aHit in eventTree.Digi_MuFilterHits:
+     T = aHit.GetAllTimes()
+     s = aHit.GetDetectorID()//10000
+     if s == 1: continue # only US and DS
+     
+     for x in T:
+       t = x.second*TDC2ns
+      #  print(s, t)
+       if t>0: 
+           if s==2: rc = h['UStime'].Fill(t)
+           if s==3: rc = h['DStime'].Fill(t)
+   h['UStime_mean'].Fill(h['UStime'].GetMean())
+   h['DStime_mean'].Fill(h['DStime'].GetMean())
+ for x in h.keys():
+   File.WriteObject(h[x], h[x].GetTitle())
+
+
+
+def eventTime(Nev=options.nEvents):
+ if Nev < 0 : Nev = eventTree.GetEntries()
+ ut.bookHist(h,'Etime','delta event time; dt [s]',100,0.0,1.)
+ ut.bookHist(h,'EtimeZ','delta event time; dt [ns]',1000,0.0,1000.)
+ ut.bookCanvas(h,'T',' ',1024,3*768,1,3)
+ 
+# need to make extra gymnastiques since absolute time is missing
+ Ntinter = []
+ N = 0
+ for f in eventTree.GetListOfFiles():
+    dN =  f.GetEntries()
+    rc = eventTree.GetEvent(N)
+    t0 = eventTree.EventHeader.GetEventTime()/freq
+    rc = eventTree.GetEvent(N+dN-1)
+    tmax = eventTree.EventHeader.GetEventTime()/freq
+    Ntinter.append([t0,tmax])
+    N+=dN
+
+ Tduration = 0
+ for x in Ntinter:
+    Tduration += (x[1]-x[0])
+ tsep = 3600.
+ t0 =  Ntinter[0][0]
+ tmax = Tduration+(tsep*(len(Ntinter)-1)) 
+ nbins = 1000
+ yunit = "events per %5.0F s"%( (tmax-t0)/nbins)
+ if 'time' in h: h.pop('time').Delete()
+ ut.bookHist(h,'time','elapsed time; t [s];'+yunit,nbins,0,tmax-t0)
+
+ N=-1
+ Tprev  = 0
+ Toffset = 0
+ for event in eventTree:
+    N+=1
+    if N>Nev: break
+    T   = event.EventHeader.GetEventTime()
+    dT = T-Tprev
+    if N>0 and dT >0:
+           rc = h['Etime'].Fill( dT/freq )
+           rc = h['EtimeZ'].Fill( dT*1E9/freq )
+           rc = h['time'].Fill( (T+Toffset)/freq-t0 )
+    elif dT<0: 
+           Toffset+=tsep*freq+Tprev
+           rc = h['time'].Fill( (T+Toffset)/freq-t0 )
+    else: rc = h['time'].Fill( T/freq-t0 ) # very first event
+    Tprev = T
+
+ tc = h['T'].cd(1)
+ h['time'].SetStats(0)
+ h['time'].Draw()
+ tend = 0
+ for x in Ntinter:
+    tend += x[1]+tsep/2.
+    m = str(int(tend))
+    h['line'+m]=ROOT.TLine(tend,0,tend,h['time'].GetMaximum())
+    h['line'+m].SetLineColor(ROOT.kRed)
+    h['line'+m].Draw()
+    tend += tsep/2.
+ tc = h['T'].cd(2)
+ tc.SetLogy(1)
+ h['EtimeZ'].Draw()
+ rc = h['EtimeZ'].Fit('expo','S','',0.,250.)
+ h['T'].Update()
+ stats = h['EtimeZ'].FindObject('stats')
+ stats.SetOptFit(1111111)
+ tc = h['T'].cd(3)
+ tc.SetLogy(1)
+ h['Etime'].Draw()
+ rc = h['Etime'].Fit('expo','S')
+ h['T'].Update()
+ stats = h['Etime'].FindObject('stats')
+ stats.SetOptFit(1111111)
+ h['T'].Update()
+ myPrint(h['T'],'time')
+
+
+
+def time_hit(Nev_st = 0, Nev_en = 1, oneUShitperPlane = True, withReco = False, DSTrack = True, res_cut = True, optionTrack = "DS", title = "US_QDC_distributions", label = "QDC", sipm_cut = "all", cut = 11, convert_sipm = False, fit = False, pion_mc = False, time_window = 100):
+
+ # veto system 2 layers with 7 bars and 8 sipm channels on both ends
+ # US system 5 layers with 10 bars and 8 sipm channels on both ends
+ # DS system horizontal(3) planes, 60 bars, readout on both sides, single channel
+ #                         vertical(4) planes, 60 bar, readout on top, single channel
+ 
+
+# need to make extra gymnastiques since absolute time is missing
+ Ntinter = []
+ N = 0
+ for f in eventTree.GetListOfFiles():
+   dN =  f.GetEntries()
+   rc = eventTree.GetEvent(N)
+   t0 = eventTree.EventHeader.GetEventTime()/freq
+   rc = eventTree.GetEvent(N+dN-1)
+   tmax = eventTree.EventHeader.GetEventTime()/freq
+   Ntinter.append([t0,tmax])
+   N+=dN
+
+
+
+ h_qdc_hit = ROOT.TH2I("qdc_vs_hit","QDC vs. Number of fired bars;Number of fired bars;QDC [MIP]", 100,0,50.,100,0,200)
+ h_qdc_hit_norm = ROOT.TH2I("qdc_vs_hit_norm","QDC/Ntot vs. Number of fired bars;Number of fired bars;Etot/Ntot [MIP]", 100,0,50.,100,0,25)
+ h_qdc_hit_time = ROOT.TH2I("qdc_vs_hit_time","QDC vs. Number of fired bars;Number of fired bars;QDC [MIP]", 100,0,50.,100,0,200)
+ h_qdc_hit_norm_time = ROOT.TH2I("qdc_vs_hit_norm_time","QDC/Ntot vs. Number of fired bars;Number of fired bars;Etot/Ntot [MIP]", 100,0,50.,100,0,25)
+ h_slope =  ROOT.TH2I("slope","slope;slope_x;slope_y", 100,-0.5,1.,100,-0.5,1.)
+ h_xy_track =  ROOT.TH2I("track_xy","track_xy;x;y", 100,-100,100.,100,-100,100.)
+ h_xy_track_res =  ROOT.TH2I("track_xy_res","track_xy_res;x;y", 100,-100,100.,100,-100,100.)
+ h_xy_track_slope_abs =  ROOT.TH2I("track_xy_slope_abs","track_xy_slope_abs;x;y", 100,-1,1.,100,-1,1.)
+ h_hit_window =  ROOT.TH1I("hit_window",f"Number of hits per {time_window} ns;Number of hits;", 50,0.0, 50)
+ h_event_duration =  ROOT.TH1I("event_duration",f"Event duration distribution;Event duration [ns];", 100,0.0, 4000)
+
+
+
+
+
+
+
+
+ N=-1
+ if Nev_en < 0 : Nev_en = eventTree.GetEntries()
+ global Tprev
+ Tprev  = 0
+ Toffset = 0
+ eventTree.GetEvent(0)
+
+
+ def get_time(N, event):
+    global Tprev
+    eventTree.GetEvent(N)
+    T   = eventTree.EventHeader.GetEventTime()
+    dT = T-Tprev
+    if N > 0 and T > 0:
+      Event_time = (T+Toffset)/freq-t0
+    else:
+      Event_time = T/freq-t0
+    Tprev = T
+    Event_time *= 10e9
+    return Event_time 
+
+
+ def find_overlaps(time_collected, time_gap = 100.):
+   common_sipms = set(time_collected[0].keys()).intersection(time_collected[1].keys()).intersection(time_collected[2].keys())
+   num_of_overlaps = 0
+   for sipm in common_sipms:
+      if np.abs(time_collected[1] - time_collected[0]) < time_gap/2 or np.abs(time_collected[1] - time_collected[2]) < time_gap/2:
+         num_of_overlaps += 1
+
+   return num_of_overlaps
+
+ st_time = 0
+ hit_window = 0
+ for event in eventTree:
+    N+=1
+    if N <= Nev_st - 1: continue 
+    if N%1000 == 0: print('event ',N,' ',time.ctime())
+    if N >= Nev_en + 1: break
+
+
+    Event_time = get_time(N-1, eventTree)
+
+    if N > 0:
+      # print(f"Event: {N}", Event_time/1e6, (Event_time - Event_time_prev)/1e6)
+      h_event_duration.Fill((Event_time - Event_time_prev))
+    Event_time_prev = Event_time
+
+    if not ana.OneHitUS1(eventTree.Digi_MuFilterHits): continue  
+    if DSTrack:
+      if withReco:
+         for aTrack in Reco_MuonTracks: aTrack.Delete()
+         Reco_MuonTracks.Clear()
+         if optionTrack=='DS': rc = trackTask.ExecuteTask("DS")
+         else                         : rc = trackTask.ExecuteTask("Scifi")
+      #print("!!!!3")
+      if not Reco_MuonTracks.GetEntries()==1:
+         #print(f"{N}: {trackTask.fittedTracks.GetEntries()}") 
+         continue
+      theTrack = Reco_MuonTracks[0]
+      if not theTrack.getFitStatus().isFitConverged() and optionTrack!='DS':   # for H8 where only two planes / proj were avaiable
+            continue
+   # only take horizontal tracks
+      state = theTrack.getFittedState(0)
+      pos   = state.getPos()
+      mom = state.getMom()
+      slopeX= mom.X()/mom.Z()
+      slopeY= mom.Y()/mom.Z()
+      h_slope.Fill(slopeX, slopeY)
+      if abs(slopeX)>0.25: continue   # 4cm distance, 250mrad = 1cm
+      if abs(slopeY)>0.1: continue
+      h_xy_track_slope_abs.Fill(mom.x()/mom.Mag(),mom.y()/mom.Mag())
+
+    qdc_per_event = 0
+    number_of_hits = 0
+
+    for aHit in event.Digi_MuFilterHits:
+        if not aHit.isValid(): continue
+        detID = aHit.GetDetectorID()
+
+        s = detID//10000 # det number (s = 1 -- veto, s = 2 -- US, s = 3 -- DS)
+        l  = (detID%10000)//1000  # plane number
+        #### only first plane
+      #   if l != 0:
+      #    continue
+        ####
+        bar = (detID%1000)
+
+        if s != 2 : continue
+        if res_cut:
+         resx, resy = ana.residual(theTrack, detID, MuFilter, h_xy_track)
+         h_xy_track_res.Fill(resx, resy)
+         #res = np.sqrt(resx**2 + resy**2)
+         res = np.abs(resy)
+         if res >= 6.:
+            continue
+        nSiPMs = aHit.GetnSiPMs()
+        nSides  = aHit.GetnSides()
+      ####################
+        MPVs_sipm_slice = {i:0 for i in range(16)}
+        #print(MPVs_sipm_slice)
+      ####################
+        qdc_value = ana.av_qdc(aHit, sipm_cut, cut, MPVs_sipm_slice)
+      #   if pion_mc:
+      #    if qdc_value < 2.:
+      #       continue
+        if qdc_value == -1:
+            continue
+
+
+            
+        allChannels = map2Dict(aHit,'GetAllSignals')
+        allTimes = aHit.GetAllTimes()
+        hit_time = []
+        for Si in allChannels:
+               if smallSiPMchannel(Si):
+                  qdc_1 = allChannels[Si] + np.array(list(MPVs_sipm_slice.values())).mean()
+               else:
+                  qdc_1 = allChannels[Si] + MPVs_sipm_slice[Si]
+               if qdc_1 == -1:
+                  continue
+               hit_time.append(Event_time + allTimes[Si])
+
+        hit_time = np.array(hit_time).mean()
+      #   print(f"Event: {N}", Event_time, hit_time, -Event_time + hit_time, st_time)
+        if hit_time - st_time < time_window:
+            hit_window += 1
+        else:
+            h_hit_window.Fill(hit_window)
+            # print(f"****** {hit_window} ******")
+            # st_time = (int(Event_time) // time_window) * time_window
+            while st_time < hit_time:
+               st_time += time_window
+            st_time -= time_window
+            hit_window = 1
+
+
+
+        q_l, q_r = ana.qdc_left_right(aHit, sipm_cut, cut, MPVs_sipm_slice)
+        qdc_per_event += qdc_value
+        number_of_hits += 1 
+    if number_of_hits > 0:
+      h_qdc_hit.Fill(number_of_hits, qdc_per_event)
+      h_qdc_hit_norm.Fill(number_of_hits, qdc_per_event/(number_of_hits))  
+
+ File = ROOT.TFile.Open(f"{title}_{options.runNumber}_run_2_test.root", "RECREATE")
+
+ c  = ROOT.TCanvas("QDC vs. NOH","QDC vs. NOH",0,0,1000,1000)
+ ROOT.gPad.SetLogz()
+ h_qdc_hit.Draw('colz')
+ c.Write()
+ c  = ROOT.TCanvas("QDC/NOH vs. NOH","QDC/NOH vs. NOH",0,0,1000,1000)
+ ROOT.gPad.SetLogz()
+ h_qdc_hit_norm.Draw('colz')
+ c.Write()
+
+
+ File.WriteObject(h_slope, h_slope.GetTitle())
+ File.WriteObject(h_xy_track, h_xy_track.GetTitle())
+ File.WriteObject(h_xy_track_res, h_xy_track_res.GetTitle())
+ File.WriteObject(h_xy_track_slope_abs, h_xy_track_slope_abs.GetTitle())
+ File.WriteObject(h_slope, h_slope.GetTitle())
+ File.WriteObject(h_hit_window, h_hit_window.GetTitle())
+ File.WriteObject(h_event_duration, h_event_duration.GetTitle())
+#  def write_dict_to_file(dict_obj, File):
+#     for key in dict_obj.keys():
+#       File.WriteObject(dict_obj[key], dict_obj[key].GetTitle())
+ 
+#  hists_all = [hist_list] + [hist_list_lr[key] for key in hist_list_lr.keys()]
+#  #write_dict_to_file(hist_list, File)
+#  for H in hists_all:
+#    write_dict_to_file(H, File)
+ File.Close()
+ print(f"File name: {title}_{options.runNumber}_run_2_test.root")
+
+
 
 #test_multiprocessing(1000)
 #pid_create_output(500)
@@ -1199,11 +1541,30 @@ def convert_data(Nev = options.nEvents, oneUShitperPlane = True, withReco = True
 # title = "300_gev_pion_ds_off_us_on_sipm_on_reco_on_largesipm_cut_11_test"
 # title = "pion_mc_pe_conversion"
 # title = "muon_100_gev_H8_no_cut"
-title = "pion_mc_no_cut_pe_saturation_2_low_cut"
-# title = "pion_300_H8_large_scale"
+# title = "pion_mc_no_cut_pe_saturation_2_low_cut_poisson"
+# title = "pion_300_H8_large_scale_time"
+# # title = "muon_100_H8_large_scale"
+# cut_key = False
+# MIP_study(Nev_st = 0,
+#    Nev_en = 100,
+#    oneUShitperPlane = True, 
+#    withReco = cut_key, 
+#    DSTrack = cut_key,
+#    res_cut = cut_key, 
+#    optionTrack = "DS", 
+#    title = title,
+#    label = "MIP",
+#    sipm_cut = "large111", 
+#    cut = 11,
+#    convert_sipm = True,
+#    pion_mc = False)
+
+title = "pion_300_H8_large_scale_time_1"
+# title = "muon_100_H8_large_scale"
 cut_key = False
-MIP_study(Nev = 10000, 
-   oneUShitperPlane = cut_key, 
+time_hit(Nev_st = 0,
+   Nev_en = 1000000,
+   oneUShitperPlane = True, 
    withReco = cut_key, 
    DSTrack = cut_key,
    res_cut = cut_key, 
@@ -1212,9 +1573,13 @@ MIP_study(Nev = 10000,
    label = "MIP",
    sipm_cut = "large111", 
    cut = 11,
-   convert_sipm = False,
-   pion_mc = True)
+   convert_sipm = True,
+   pion_mc = False,
+   time_window = 400)
 
+# eventTime(1000000)
 # SiPM_study(Nev = -1, oneUShitperPlane = True, withReco = True, DSTrack = True, optionTrack = "DS", title = "SiPM_100_gev_muon_pl_0_bar_9_ds_on_us_on_res_on_all")
 
 #convert_data(-1)
+
+# TimeStudy(10000)

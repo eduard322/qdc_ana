@@ -983,73 +983,6 @@ def eventTime(Nev=options.nEvents):
  h['T'].Update()
  myPrint(h['T'],'time')
 
-def TimeStudy(Nev=options.nEvents,withDisplay=False):
- if Nev < 0 : Nev = eventTree.GetEntries()
- ut.bookHist(h,'Vetotime','time',1000,0.,50.)
- ut.bookHist(h,'UStime','time',1000,0.,50.)
- ut.bookHist(h,'DStime','time',1000,0.,50.)
- ut.bookHist(h,'Stime','time',1000,0.,50.)
- ut.bookHist(h,'SvsDStime','; mean Scifi time [ns];mean Mufi time [ns]',100,0.,50.,100,0.,50.)
- ut.bookHist(h,'VEvsUStime','; mean US time [ns];mean VE time [ns]',100,0.,50.,100,0.,50.)
- ut.bookCanvas(h,'T','',900,1200,1,2)
- tc = h['T'].cd(1)
- h['Vetotime'].SetLineColor(ROOT.kOrange)
- h['UStime'].SetLineColor(ROOT.kGreen)
- h['DStime'].SetLineColor(ROOT.kRed)
- N=-1
- for event in eventTree:
-   N+=1
-   if N>Nev: break
-   h['UStime'].Reset()
-   h['DStime'].Reset()
-   h['Vetotime'].Reset()
-   h['Stime'].Reset()
-   for aHit in eventTree.Digi_MuFilterHits:
-     T = aHit.GetAllTimes()
-     s = aHit.GetDetectorID()//10000
-     for x in T:
-       t = x.second*TDC2ns
-       if t>0: 
-           if s==1: rc = h['Vetotime'].Fill(t)
-           if s==2: rc = h['UStime'].Fill(t)
-           if s==3: rc = h['DStime'].Fill(t)
-   stations = {}
-   for aHit in eventTree.Digi_ScifiHits:
-      t = aHit.GetTime()*TDC2ns
-      rc = h['Stime'].Fill(t)
-      stations[aHit.GetDetectorID()//1000000] = 1
-   if len(stations)>3:
-       rc = h['SvsDStime'].Fill(h['Stime'].GetMean(),h['DStime'].GetMean())
-       rc = h['VEvsUStime'].Fill(h['UStime'].GetMean(),h['Vetotime'].GetMean())
-   if withDisplay:
-     tc = h['T'].cd(1)
-     h['UStime'].Draw()
-     h['DStime'].Draw('same')
-     h['Vetotime'].Draw('same')
-     tc = h['T'].cd(2)
-     h['Stime'].Draw()
-     rc = input("hit return for next event or q for quit: ")
-     if rc=='q': break
- tc = h['T'].cd(1)
- h['SvsDStime'].Draw('colz')
- tc = h['T'].cd(2)
- h['SvsDStime_mufi'] = h['SvsDStime'].ProjectionY('SvsDStime_mufi')
- h['SvsDStime_scifi'] = h['SvsDStime'].ProjectionX('SvsDStime_scifi')
- h['Vetime'] = h['VEvsUStime'].ProjectionY('Vetime')
- h['UStime'] = h['VEvsUStime'].ProjectionX('UStime')
- h['SvsDStime_mufi'].SetLineColor(ROOT.kRed)
- h['SvsDStime_scifi'].SetLineColor(ROOT.kGreen)
- h['UStime'].SetLineColor(ROOT.kBlue)
- h['Vetime'].SetLineColor(ROOT.kOrange)
- h['UStime'].SetStats(0)
- h['Vetime'].SetStats(0)
- h['SvsDStime_mufi'].SetStats(0)
- h['SvsDStime_scifi'].SetStats(0)
- h['SvsDStime_mufi'].Draw()
- h['SvsDStime_scifi'].Draw('same')
- h['UStime'].Draw('same')
- h['Vetime'].Draw('same')
-
 def beamSpot():
    trackTask.ExecuteTask()
    Xbar = -10
@@ -2542,6 +2475,86 @@ def MIP_study_2(Nev = options.nEvents, file_name = "", oneUShitperPlane = True, 
 
 
 
+def TimeStudy(Nev=options.nEvents,withDisplay=False):
+ File = ROOT.TFile.Open(f"time_{options.runNumber}_run_2_test.root", "RECREATE")
+ if Nev < 0 : Nev = eventTree.GetEntries()
+ ut.bookHist(h,'Vetotime','Vetotime',1000,0.,50.)
+ ut.bookHist(h,'UStime','UStime',1000,0.,50.)
+ ut.bookHist(h,'DStime','DStime',1000,0.,50.)
+ ut.bookHist(h,'Stime','Stime',1000,0.,50.)
+ ut.bookHist(h,'SvsDStime','; mean Scifi time [ns];mean Mufi time [ns]',100,0.,50.,100,0.,50.)
+ ut.bookHist(h,'VEvsUStime','; mean US time [ns];mean VE time [ns]',100,0.,50.,100,0.,50.)
+#  ut.bookCanvas(h,'T','',900,1200,1,2)
+ c  = ROOT.TCanvas('T','',0,0,1000,1000)
+ c.Divide(1,2)
+ c.cd(1)
+ h['Vetotime'].SetLineColor(ROOT.kOrange)
+ h['UStime'].SetLineColor(ROOT.kGreen)
+ h['DStime'].SetLineColor(ROOT.kRed)
+ N=-1
+ for event in eventTree:
+   N+=1
+   if N%1000 == 0: print('event ',N,' ',time.ctime())
+   if N>Nev: break
+   # h['UStime'].Reset()
+   # h['DStime'].Reset()
+   # h['Vetotime'].Reset()
+   # h['Stime'].Reset()
+   for aHit in eventTree.Digi_MuFilterHits:
+     T = aHit.GetAllTimes()
+     s = aHit.GetDetectorID()//10000
+     
+     for x in T:
+       t = x.second*TDC2ns
+      #  print(t)
+       if t>0: 
+           if s==1: rc = h['Vetotime'].Fill(t)
+           if s==2: rc = h['UStime'].Fill(t)
+           if s==3: rc = h['DStime'].Fill(t)
+   stations = {}
+   for aHit in eventTree.Digi_ScifiHits:
+      t = aHit.GetTime()*TDC2ns
+      rc = h['Stime'].Fill(t)
+      stations[aHit.GetDetectorID()//1000000] = 1
+   if len(stations)>3:
+       rc = h['SvsDStime'].Fill(h['Stime'].GetMean(),h['DStime'].GetMean())
+       rc = h['VEvsUStime'].Fill(h['UStime'].GetMean(),h['Vetotime'].GetMean())
+   # if withDisplay:
+   #   tc = h['T'].cd(1)
+   #   h['UStime'].Draw()
+   #   h['DStime'].Draw('same')
+   #   h['Vetotime'].Draw('same')
+   #   tc = h['T'].cd(2)
+   #   h['Stime'].Draw()
+   #   rc = input("hit return for next event or q for quit: ")
+   #   if rc=='q': break
+ c.cd(1)
+ h['SvsDStime'].Draw('colz')
+ h['UStime'].Draw()
+ h['DStime'].Draw('same')
+ h['Vetotime'].Draw('same')
+ c.cd(2)
+ h['Stime'].Draw()
+ h['SvsDStime_mufi'] = h['SvsDStime'].ProjectionY('SvsDStime_mufi')
+ h['SvsDStime_scifi'] = h['SvsDStime'].ProjectionX('SvsDStime_scifi')
+ h['Vetime'] = h['VEvsUStime'].ProjectionY('Vetime')
+ h['UStime'] = h['VEvsUStime'].ProjectionX('UStime')
+ h['SvsDStime_mufi'].SetLineColor(ROOT.kRed)
+ h['SvsDStime_scifi'].SetLineColor(ROOT.kGreen)
+ h['UStime'].SetLineColor(ROOT.kBlue)
+ h['Vetime'].SetLineColor(ROOT.kOrange)
+ h['UStime'].SetStats(0)
+ h['Vetime'].SetStats(0)
+ h['SvsDStime_mufi'].SetStats(0)
+ h['SvsDStime_scifi'].SetStats(0)
+ h['SvsDStime_mufi'].Draw()
+ h['SvsDStime_scifi'].Draw('same')
+ h['UStime'].Draw('same')
+ h['Vetime'].Draw('same')
+ c.Write()
+ for x in h:
+   File.WriteObject(h[x], h[x].GetTitle())
+
 #eventTime_for_filter_trash(5000000)
 #eventTime(5000000)
 
@@ -2558,8 +2571,13 @@ def MIP_study_2(Nev = options.nEvents, file_name = "", oneUShitperPlane = True, 
 #Mufi_hitMaps_qdc_sipm_filter(1000000) # qdc distribution sipm filter
 #Mufi_hitMaps_qdc_5planes_hits(1000000)
 #Mufi_hitMaps_mean_qdc(1000000, 1)
-MIP_study_2(-1, oneUShitperPlane = False)
+#MIP_study_2(-1, oneUShitperPlane = False)
+
+# !!!!!!!!!!!!!!!
 #execute_mufi_hit_maps_filtered(1000000) # qdc distribution filtered
-   
+
    
    #print("plane", plane, "bar", bar) 
+
+print("check")
+TimeStudy(100000, True)
